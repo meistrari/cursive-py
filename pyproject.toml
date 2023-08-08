@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "cursivepy"
+version = "0.1.0"
+description = ""
+authors = ["Rodrigo Godinho <god@meistrari.com>"]
+readme = "README.md"
+packages = [{include = "cursivepy"}]
+
+[tool.poetry.scripts]
+test = "cursive_py.test:main"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+tiktoken = "^0.4.0"
+openai = "^0.27.8"
+anthropic = "^0.3.6"
+pydantic = "^1.9.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
