@@ -3,7 +3,7 @@ from typing import Any, Callable
 
 from pydantic import validate_arguments
 
-from cursive_py.utils import trim
+from cursive.utils import trim
 
 class CursiveFunction:
     def __init__(self, function: Callable, pause=False):

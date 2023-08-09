@@ -189,3 +189,18 @@ CursiveHook = Literal[
     'ask:success',
     'ask:error',
 ]
+
+class CursiveHookPayload():
+    data: Optional[Any]
+    error: Optional[CursiveError]
+    duration: Optional[float]
+
+    def __init__(
+        self,
+        data: Optional[Any] = None,
+        error: Optional[CursiveError] = None,
+        duration: Optional[float] = None,
+    ):
+        self.data = data
+        self.error = error
+        self.duration = duration

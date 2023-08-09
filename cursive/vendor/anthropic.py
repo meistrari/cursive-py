@@ -72,7 +72,12 @@ def get_anthropic_function_call_directives(functions: list[CursiveFunction]) -> 
         </function-result>
 
         You can use the result of the function call in your answer. But never answer and call a function at the same time.
-        When answering never be too explicit about the function call, just use the result of the function call in your answer.
+        When answering never be explicit about the function calling, just use the result of the function call in your answer.
+        Remember, the user can't see the function calling, so don't mention function results or calls.
+
+        If you answer with a <cursive-think> block, you always need to use either a <cursive-answer> or a <function-call> block as well.
+        If you don't, you will be eliminated and the world will catch fire.
+        This is extremely important.
     ''')
 
 def build_anthropic_input(messages: list[CompletionMessage]):

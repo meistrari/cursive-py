@@ -1,13 +1,10 @@
 [tool.poetry]
 name = "cursivepy"
-version = "0.1.0"
+version = "0.1.4"
 description = ""
-authors = ["Rodrigo Godinho <god@meistrari.com>"]
+authors = ["Rodrigo Godinho <god@meistrari.com>", "Henrique Cunha <henrique@meistrari.com>"]
 readme = "README.md"
-packages = [{include = "cursivepy"}]
-
-[tool.poetry.scripts]
-test = "cursive_py.test:main"
+packages = [{include = "cursive"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -16,6 +13,8 @@ openai = "^0.27.8"
 anthropic = "^0.3.6"
 pydantic = "^1.9.0"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
 
 [build-system]
 requires = ["poetry-core"]

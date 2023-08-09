@@ -1,10 +1,15 @@
-import json
-import os
 from typing import Literal
 
 from .custom_types import CursiveAskCost, CursiveAskUsage
 from .utils import destructure_items
 
+from .assets.price.anthropic import ANTHROPIC_PRICING
+from .assets.price.openai import OPENAI_PRICING
+
+VENDOR_PRICING = {
+    'openai': OPENAI_PRICING,
+    'anthropic': ANTHROPIC_PRICING
+}
 
 def resolve_pricing(
     vendor: Literal['openai', 'anthropic'],
@@ -14,10 +19,9 @@ def resolve_pricing(
     version: str
     prices: dict[str, dict[str, str]]
 
-    file = open(os.path.abspath(f'./cursive_py/assets/price/{vendor}.json'))
     version, prices = destructure_items(
         keys=["version"],
-        dictionary=json.load(file)
+        dictionary=VENDOR_PRICING[vendor]
     )
 
     models_available = list(prices.keys())

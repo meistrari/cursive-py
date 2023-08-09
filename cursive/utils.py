@@ -5,13 +5,15 @@ import re
 
 
 def destructure_items(keys: list[str], dictionary: dict):
-    items = []
+    items = [
+        dictionary[key] for key in keys
+    ]
     
-    for key in keys:
-        items.append(dictionary[key])
-        del dictionary[key]
-    
-    return *items, dictionary
+    new_dictionary = {
+        k:v for k,v in dictionary.items() if k not in keys
+    }
+
+    return *items, new_dictionary
 
 
 def filter_null_values(dictionary: dict):

@@ -2,6 +2,7 @@ import json
 import re
 import time
 from typing import Any, Callable, Generic, Optional, TypeVar
+import os
 
 import openai as openai_client
 from anthropic import APIError
@@ -21,6 +22,7 @@ from .custom_types import (
     CursiveErrorCode,
     CursiveFunction,
     CursiveHook,
+    CursiveHookPayload,
     CursiveSetupOptions,
     CursiveSetupOptionsExpand,
 )
@@ -49,10 +51,11 @@ class Cursive:
         anthropic: Optional[dict[str, Any]] = None,
     ):
         anthropic_client = None
-        if openai:
-            openai_client.api_key = openai['api_key']
-        if anthropic:
-            anthropic_client = AnthropicClient(anthropic['api_key'])
+        
+        openai_client.api_key = (openai or {}).get('api_key') or \
+            os.environ.get('OPENAI_API_KEY')
+        anthropic_client = AnthropicClient((anthropic or {}).get('api_key') or \
+            os.environ.get('ANTHROPIC_API_KEY'))
 
         self._hooks = create_hooks()
         self._vendor = CursiveVendors(
@@ -135,7 +138,7 @@ class Cursive:
             'model': 'text-embedding-ada-002',
             'input': content,
         }
-        self._hooks.call_hook('embedding:before', options)
+        self._hooks.call_hook('embedding:before', CursiveHookPayload(data=options))
         start = time.time()
         try:
             data = self._vendor.openai.Embedding.create(
@@ -146,8 +149,14 @@ class Cursive:
             result = {
                 'embedding': data['data'][0]['embedding'], # type: ignore
             }
-            self._hooks.call_hook('embedding:success', result, time.time() - start)
-            self._hooks.call_hook('embedding:after', result, None, time.time() - start)
+            self._hooks.call_hook('embedding:success', CursiveHookPayload(
+                data=result,
+                time=time.time() - start,
+            ))
+            self._hooks.call_hook('embedding:after', CursiveHookPayload(
+                data=result, 
+                duration=time.time() - start
+            ))
 
             return result['embedding']
         except self._vendor.openai.OpenAIError as e:
@@ -156,8 +165,16 @@ class Cursive:
                 details=e,
                 code=CursiveErrorCode.embedding_error
             )
-            self._hooks.call_hook('embedding:error', error, time.time() - start)
-            self._hooks.call_hook('embedding:after', error, time.time() - start)
+            self._hooks.call_hook('embedding:error', CursiveHookPayload(
+                data=error,
+                error=error,
+                duration=time.time() - start
+            ))
+            self._hooks.call_hook('embedding:after', CursiveHookPayload(
+                data=error,
+                error=error,
+                duration=time.time() - start
+            ))
             raise error
     
         
@@ -193,7 +210,7 @@ def resolve_options(
     resolved_system_message = ''
     if vendor == 'anthropic' and len(functions) > 0:
         resolved_system_message = (
-            system_message or ''
+            (system_message or '')
             + '\n\n'
             + get_anthropic_function_call_directives(functions)
         )
@@ -265,7 +282,7 @@ def create_completion(
     cursive: Cursive,
     on_token: Optional[CursiveAskOnToken] = None,
 ) -> CreateChatCompletionResponseExtended:
-    cursive._hooks.call_hook('completion:before', payload)
+    cursive._hooks.call_hook('completion:before', CursiveHookPayload(data=payload))
     data = {}
     start = time.time()
 
@@ -369,6 +386,23 @@ def create_completion(
             answer = answer_matches.pop().strip()
             data['choices'][0]['message']['content'] = answer
         
+        # As a defensive measure, we check for <cursive-think> tags
+        # and remove them
+        has_think_regex = r'<cursive-think>([^<]+)<\/cursive-think>'
+        think_matches = re.findall(
+            has_think_regex,
+            data['choices'][0]['message']['content']
+        )
+        if len(think_matches) > 0:
+            data['choices'][0]['message']['content'] = re.sub(
+                has_think_regex,
+                '',
+                data['choices'][0]['message']['content']
+            )
+
+        # Strip leading and trailing whitespaces
+        data['choices'][0]['message']['content'] = data['choices'][0]['message']['content'].strip()
+
         data['cost'] = resolve_pricing(
             vendor='anthropic',
             usage=CursiveAskUsage(
@@ -387,12 +421,14 @@ def create_completion(
             details=data['error'],
             code=CursiveErrorCode.completion_error
         )
-        cursive._hooks.call_hook('completion:error', error, end - start)
-        cursive._hooks.call_hook('completion:after', None, error, end - start)
+        hook_payload = CursiveHookPayload(data=None, error=error, duration=end - start)
+        cursive._hooks.call_hook('completion:error', hook_payload)
+        cursive._hooks.call_hook('completion:after', hook_payload)
         raise error
 
-    cursive._hooks.call_hook('completion:success', data, end - start)
-    cursive._hooks.call_hook('completion:after', data, None, end - start)
+    hook_payload = CursiveHookPayload(data=data, error=None, duration=end - start)
+    cursive._hooks.call_hook('completion:success', hook_payload)
+    cursive._hooks.call_hook('completion:after', hook_payload)
     return CreateChatCompletionResponseExtended(**data)
 
 
@@ -417,29 +453,6 @@ def ask_model(
     messages: Optional[list[CompletionMessage]] = None,
     prompt: Optional[str] = None,
 ) -> CursiveAskModelResponse: 
-    cursive._hooks.call_hook('ask:before', {
-        'model': model,
-        'system_message': system_message,
-        'functions': functions,
-        'function_call': function_call,
-        'on_token': on_token,
-        'max_tokens': max_tokens,
-        'stop': stop,
-        'temperature': temperature,
-        'top_p': top_p,
-        'presence_penalty': presence_penalty,
-        'frequency_penalty': frequency_penalty,
-        'best_of': best_of,
-        'n': n,
-        'logit_bias': logit_bias,
-        'user': user,
-        'stream': stream,
-        'messages': messages,
-        'prompt': prompt,
-    })
-
-    start = time.time()
-
     payload, resolved_options = resolve_options(
         model=model,
         system_message=system_message,
@@ -460,6 +473,9 @@ def ask_model(
         messages=messages,
         prompt=prompt,
     )
+    start = time.time()
+
+    
     functions = functions or []
 
     if (type(function_call) == CursiveFunction):
@@ -476,7 +492,6 @@ def ask_model(
         on_token=on_token,
     ), CursiveError)
 
-    (completion, error)
     if error:
         if (not error.details):
             raise CursiveError(
@@ -544,8 +559,9 @@ def ask_model(
             details=error.details,
             code=CursiveErrorCode.completion_error
         )
-        cursive._hooks.call_hook('ask:error', error)
-        cursive._hooks.call_hook('ask:after', None, error=error)
+        hook_payload = CursiveHookPayload(error=error)
+        cursive._hooks.call_hook('ask:error', hook_payload)
+        cursive._hooks.call_hook('ask:after', hook_payload)
         raise error
 
     if (
@@ -616,8 +632,9 @@ def ask_model(
             })
 
     end = time.time()
-    cursive._hooks.call_hook('ask:after', completion, None, end - start)
-    cursive._hooks.call_hook('ask:success', completion, end - start)
+    hook_payload = CursiveHookPayload(data=completion, duration=end - start)
+    cursive._hooks.call_hook('ask:after', hook_payload)
+    cursive._hooks.call_hook('ask:success', hook_payload)
 
     return CursiveAskModelResponse(
         answer=completion,

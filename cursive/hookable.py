@@ -234,7 +234,6 @@ class Hookable:
 def create_hooks():
     return Hookable()
 
-
 def create_debugger(hooks: Hookable, _options: dict[str, Any] = {}):
     options = {
         'filter': lambda: True,
