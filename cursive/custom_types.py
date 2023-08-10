@@ -3,31 +3,27 @@ from typing import Any, Callable, Literal, Optional
 
 from pydantic import BaseModel as PydanticBaseModel
 
-
+from cursive.utils import random_id
 
 class BaseModel(PydanticBaseModel):
     class Config:
         arbitrary_types_allowed = True
-
 
 class CursiveFunction(BaseModel):
     function_schema: dict[str, Any]
     definition: Callable
     pause: Optional[bool] = None
 
-
 class CursiveAskUsage(BaseModel):
     completion_tokens: int
     prompt_tokens: int
     total_tokens: int
-
 
 class CursiveAskCost(BaseModel):
     completion: float
     prompt: float
     total: float
     version: str
-
 
 Role = Literal[
     'system',
@@ -36,11 +32,9 @@ Role = Literal[
     'function',
 ]
 
-
 class ChatCompletionRequestMessageFunctionCall(BaseModel):
     name: Optional[str] = None
     arguments: Optional[str] = None
-
 
 class CompletionMessage(BaseModel):
     id: Optional[str] = None
@@ -49,13 +43,15 @@ class CompletionMessage(BaseModel):
     name: Optional[str] = None
     function_call: Optional[ChatCompletionRequestMessageFunctionCall] = None
 
+    def __init__(self, **data):
+        super().__init__(**data)
+        if not self.id:
+            self.id = random_id()
 
 class CursiveSetupOptionsExpand(BaseModel):
     enabled: Optional[bool] = None
     defaults_to: Optional[str] = None
     model_mapping: Optional[dict[str, str]] = None
-
-
 
 CursiveAvailableModels = Literal[
     # OpenAI
@@ -66,14 +62,12 @@ CursiveAvailableModels = Literal[
     'claude-2',
 ]
 
-
 class CursiveErrorCode(Enum):
     function_call_error = 'function_call_error',
     completion_error = 'completion_error',
     invalid_request_error = 'invalid_request_error',
     embedding_error = 'embedding_error',
     unknown_error = 'unknown_error',
-
 
 class CursiveError(Exception):
     name = 'CursiveError'
@@ -89,18 +83,16 @@ class CursiveError(Exception):
         self.code = code
         super().__init__(self.message)
 
-
 class CursiveEnrichedAnswer(BaseModel):
     error: CursiveError | None
     usage: CursiveAskUsage | None
     model: str
     id: str | None
-    choices: list[str] | None
+    choices: Optional[list[Any]] = None
     function_result: Any | None
     answer: str | None
     messages: list[CompletionMessage] | None
     cost: CursiveAskCost | None
-
 
 CursiveAskOnToken = Callable[[dict[str, Any]], None]
 
@@ -122,24 +114,20 @@ class CursiveAskOptionsBase(BaseModel):
     user: Optional[str] = None
     stream: Optional[bool] = None
 
-
 class CreateChatCompletionResponse(BaseModel):
     id: str
     model: str
     choices: list[Any]
     usage: Optional[Any] = None
 
-
 class CreateChatCompletionResponseExtended(CreateChatCompletionResponse):
     function_result: Optional[Any] = None
     cost: CursiveAskCost
     error: Optional[CursiveError] = None
 
-
 class CursiveAskModelResponse(BaseModel):
     answer: CreateChatCompletionResponseExtended
     messages: list[CompletionMessage]
-
 
 class CursiveSetupOptions(BaseModel):
     max_retries: Optional[int] = None
@@ -152,7 +140,6 @@ class CompletionRequestFunctionCall(BaseModel):
 class CompletionRequestStop(BaseModel):
     messages_seen: Optional[list[CompletionMessage]] = None
     max_turns: Optional[int] = None
-
 
 class CompletionFunctions(BaseModel):
     name: str

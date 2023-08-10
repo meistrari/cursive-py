@@ -39,6 +39,7 @@ from .vendor.anthropic import (
 from .vendor.index import resolve_vendor_from_model
 from .vendor.openai import process_openai_stream
 
+# TODO: Improve implementation architecture, this was a quick and dirty
 class Cursive:
     options: CursiveSetupOptions
 
@@ -123,7 +124,10 @@ class Cursive:
 
         new_messages = [
             *(result and result.messages or []),
-            { 'role': 'assistant', 'content': result and result.answer or '' },
+            CompletionMessage(
+                role='assistant',
+                content=result and result.answer or '',
+            )
         ]
 
         return CursiveAnswer(
@@ -616,11 +620,9 @@ def ask_model(
         ))
 
         if function_definition.pause:
+            completion.function_result = function_result
             return CursiveAskModelResponse(
-                answer=CreateChatCompletionResponseExtended(**{
-                    **completion,
-                    'function_result': function_result,
-                }),
+                answer=CreateChatCompletionResponseExtended(**completion.dict()),
                 messages=messages,
             )
         else:
@@ -753,7 +755,6 @@ class CursiveConversation:
     ):
         messages=[
             *self.messages,
-            CompletionMessage(role='user', content=prompt),
         ]
 
         result = build_answer(
@@ -783,7 +784,7 @@ class CursiveConversation:
 
         new_messages = [
             *(result and result.messages or []),
-            { 'role': 'assistant', 'content': result and result.answer or '' },
+            CompletionMessage(role='assistant', content=result and result.answer or ''),
         ]
 
         return CursiveAnswer[None](

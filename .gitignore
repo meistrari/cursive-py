@@ -3,3 +3,4 @@
 dist
 **/*/__pycache__
 playground.py
+.pytest_cache
