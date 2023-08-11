@@ -112,10 +112,10 @@ def create_character(name: str, age: str):
         'age': age,
     }
 
-res = cursive.ask({
+res = cursive.ask(
     prompt='Create a character named John who is 23 years old.',
     functions=[create_character],
-})
+)
 
 print(res.function_result) # { name: 'John', age: 23 }
 ```
