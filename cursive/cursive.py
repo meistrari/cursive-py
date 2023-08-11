@@ -1,11 +1,14 @@
 import json
-import re
 import time
 from typing import Any, Callable, Generic, Optional, TypeVar
 import os
 
 import openai as openai_client
 from anthropic import APIError
+
+from cursive.build_input import get_function_call_directives
+from cursive.function import parse_custom_function_call
+from cursive.vendor.cohere import CohereClient
 
 from .custom_types import (
     BaseModel,
@@ -33,7 +36,6 @@ from .usage.openai import get_openai_usage
 from .utils import filter_null_values, random_id, resguard
 from .vendor.anthropic import (
     AnthropicClient,
-    get_anthropic_function_call_directives,
     process_anthropic_stream,
 )
 from .vendor.index import resolve_vendor_from_model
@@ -50,18 +52,20 @@ class Cursive:
         debug: Optional[bool] = None,
         openai: Optional[dict[str, Any]] = None,
         anthropic: Optional[dict[str, Any]] = None,
+        cohere: Optional[dict[str, Any]] = None,
     ):
-        anthropic_client = None
-        
         openai_client.api_key = (openai or {}).get('api_key') or \
             os.environ.get('OPENAI_API_KEY')
         anthropic_client = AnthropicClient((anthropic or {}).get('api_key') or \
             os.environ.get('ANTHROPIC_API_KEY'))
+        cohere_client = CohereClient((cohere or {}).get('api_key') or \
+            os.environ.get('CO_API_KEY', '---'))
 
         self._hooks = create_hooks()
         self._vendor = CursiveVendors(
             openai=openai_client,
             anthropic=anthropic_client,
+            cohere=cohere_client,
         )
         self.options = CursiveSetupOptions(
             max_retries=max_retries,
@@ -212,11 +216,11 @@ def resolve_options(
     # TODO: Add support for function call resolving
     vendor = resolve_vendor_from_model(model)
     resolved_system_message = ''
-    if vendor == 'anthropic' and len(functions) > 0:
+    if  vendor in ['anthropic', 'cohere'] and len(functions) > 0:
         resolved_system_message = (
             (system_message or '')
             + '\n\n'
-            + get_anthropic_function_call_directives(functions)
+            + get_function_call_directives(functions)
         )
 
     query_messages: list[CompletionMessage] = [message for message in [
@@ -341,6 +345,13 @@ def create_completion(
                 code=CursiveErrorCode.completion_error
             )
         
+
+        data = {
+            'choices': [{ 'message': { 'content': response.completion.lstrip() } }],
+            'model': payload.model,
+            'id': random_id(),
+            'usage': {},
+        }
         if payload.stream:
             data = process_anthropic_stream(
                 payload=payload,
@@ -348,64 +359,8 @@ def create_completion(
                 response=response,
                 on_token=on_token,
             )
-        else:
-            data = {
-                'choices': [{ 'message': { 'content': response.completion.lstrip() } }],
-                'model': payload.model,
-                'id': random_id(),
-                'usage': {},
-            }
-            if error:
-                raise CursiveError(
-                    message=error.message,
-                    details=error, 
-                    code=CursiveErrorCode.completion_error
-                )
 
-        # We check for function call in the completion
-        has_function_call_regex = r'<function-call>([^<]+)<\/function-call>'
-        function_call_matches = re.findall(
-            has_function_call_regex,
-            data['choices'][0]['message']['content']
-        )
-
-        if len(function_call_matches) > 0:
-            function_call = json.loads(function_call_matches.pop().strip())
-            data['choices'][0]['message']['function_call'] = {
-                'name': function_call['name'],
-                'arguments': json.dumps(function_call['arguments']),
-            }
-
-        data['usage']['prompt_tokens'] = get_anthropic_usage(payload.messages)
-        data['usage']['completion_tokens'] = get_anthropic_usage(data['choices'][0]['message']['content'])
-        data['usage']['total_tokens'] = data['usage']['completion_tokens'] + data['usage']['prompt_tokens']
-
-        # We check for answers in the completion
-        has_answer_regex = r'<cursive-answer>([^<]+)<\/cursive-answer>'
-        answer_matches = re.findall(
-            has_answer_regex,
-            data['choices'][0]['message']['content']
-        )
-        if len(answer_matches) > 0:
-            answer = answer_matches.pop().strip()
-            data['choices'][0]['message']['content'] = answer
-        
-        # As a defensive measure, we check for <cursive-think> tags
-        # and remove them
-        has_think_regex = r'<cursive-think>([^<]+)<\/cursive-think>'
-        think_matches = re.findall(
-            has_think_regex,
-            data['choices'][0]['message']['content']
-        )
-        if len(think_matches) > 0:
-            data['choices'][0]['message']['content'] = re.sub(
-                has_think_regex,
-                '',
-                data['choices'][0]['message']['content']
-            )
-
-        # Strip leading and trailing whitespaces
-        data['choices'][0]['message']['content'] = data['choices'][0]['message']['content'].strip()
+        parse_custom_function_call(data, payload, get_anthropic_usage)
 
         data['cost'] = resolve_pricing(
             vendor='anthropic',
@@ -416,6 +371,27 @@ def create_completion(
             ),
             model=data['model']
         )
+    elif vendor == 'cohere':
+        response, error = cursive._vendor.cohere.create_completion(payload)
+        if error:
+            raise CursiveError(
+                message=error.message,
+                details=error,
+                code=CursiveErrorCode.completion_error
+            )
+        
+        data = {
+            'choices': [{ 'message': { 'content': response.data[0].text.lstrip() } }],
+            'model': payload.model,
+            'id': random_id(),
+            'usage': {},
+        }
+        
+        if payload.stream:
+            # TODO: Implement stream processing for Cohere
+            pass
+
+        parse_custom_function_call(data, payload)
 
     end = time.time()
 
@@ -503,6 +479,7 @@ def ask_model(
                 details=error,
                 code=CursiveErrorCode.unknown_error
             ) from error
+        print(error)
         cause = error.details.code or error.details.type
         if (cause == 'context_length_exceeded'):
             if (
@@ -595,13 +572,32 @@ def ask_model(
                 'cursive': cursive,
             })
 
-        args, _ = resguard(
-            lambda: json.loads(func_call['arguments'] or '{}'),
-            SyntaxError
-        )
+        try:
+            name = func_call['name']
+            called_function = next((func for func in payload.functions if func['name'] == name), None)
+            arguments = json.loads(func_call['arguments'] or '{}')
+            if called_function:
+                props = called_function['parameters']['properties']
+                for k, v in props.items():
+                    if k in arguments:
+                        arg_type = v['type']
+                        if arg_type == 'string':
+                            arguments[k] = str(arguments[k])
+                        elif arg_type == 'number':
+                            arguments[k] = float(arguments[k])
+                        elif arg_type == 'integer':
+                            arguments[k] = int(arguments[k])
+                        elif arg_type == 'boolean':
+                            arguments[k] = bool(arguments[k])
+        except Exception as e:
+            raise CursiveError(
+                message=f'Error while parsing function arguments for ${func_call["name"]}',
+                details=e,
+                code=CursiveErrorCode.function_call_error,
+            )
 
         function_result, error = resguard(
-            lambda: function_definition.definition(**args),
+            lambda: function_definition.definition(**arguments),
         )
 
         if error:
@@ -620,6 +616,7 @@ def ask_model(
         ))
 
         if function_definition.pause:
+
             completion.function_result = function_result
             return CursiveAskModelResponse(
                 answer=CreateChatCompletionResponseExtended(**completion.dict()),
@@ -707,7 +704,7 @@ def build_answer(
             completion_tokens=result.answer.usage['completion_tokens'],
             prompt_tokens=result.answer.usage['prompt_tokens'],
             total_tokens=result.answer.usage['total_tokens'],
-        )
+        ) if result.answer.usage else None
 
         return CursiveEnrichedAnswer(
             error=None,
@@ -870,3 +867,4 @@ class CursiveAnswer(Generic[E]):
 class CursiveVendors(BaseModel):
     openai: Optional[Any] = None
     anthropic: Optional[AnthropicClient] = None
+    cohere: Optional[CohereClient] = None

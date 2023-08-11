@@ -17,7 +17,7 @@ def destructure_items(keys: list[str], dictionary: dict):
 
 
 def filter_null_values(dictionary: dict):
-    return { k:v for k,v in dictionary.items() if v is not None }
+    return { k:v for k, v in dictionary.items() if v is not None }
 
 
 def random_id():

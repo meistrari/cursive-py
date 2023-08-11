@@ -122,7 +122,7 @@ class CreateChatCompletionResponse(BaseModel):
 
 class CreateChatCompletionResponseExtended(CreateChatCompletionResponse):
     function_result: Optional[Any] = None
-    cost: CursiveAskCost
+    cost: Optional[CursiveAskCost] = None
     error: Optional[CursiveError] = None
 
 class CursiveAskModelResponse(BaseModel):
