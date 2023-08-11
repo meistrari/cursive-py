@@ -92,7 +92,7 @@ res = cursive.ask(
     functions=[sum],
 )
 
-print(answer) # The sum of 232 and 243 is 475.
+print(res.answer) # The sum of 232 and 243 is 475.
 ```
 
 The functions' result will automatically be fed into the conversation and another completion will be made. If you want to prevent this, you can add `pause` to your function definition.
@@ -114,7 +114,7 @@ def create_character(name: str, age: str):
 
 res = cursive.ask({
     prompt='Create a character named John who is 23 years old.',
-    functions=[createCharacter],
+    functions=[create_character],
 })
 
 print(res.function_result) # { name: 'John', age: 23 }
