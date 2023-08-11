@@ -1,4 +1,4 @@
-![Logo](/docs/logo-dark.svg#gh-dark-mode-only)
+t![Logo](/docs/logo-dark.svg#gh-dark-mode-only)
 ![Logo](/docs/logo-light.svg#gh-light-mode-only)
 
 Cursive is a universal and intuitive framework for interacting with LLMs.
@@ -114,7 +114,7 @@ def create_character(name: str, age: str):
 
 res = cursive.ask({
     prompt='Create a character named John who is 23 years old.',
-    functions=[createCharacter],
+    functions=[create_character],
 })
 
 print(res.function_result) # { name: 'John', age: 23 }
