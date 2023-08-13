@@ -166,6 +166,24 @@ cursive = Cursive(
 )
 ```
 
+## available models
+##### OpenAI
+- `gpt-3.5-turbo`
+- `gpt-3.5-turbo-16k`
+- `gpt-4`
+- `gpt-4-32k`
+- Any other chat completion model version
+
+##### Anthropic
+- `claude-2`
+- `claude-instant-1`
+- `claude-instant-1.2`
+- Any other model version
+
+##### Anthropic
+- `command`
+- Any other model version (such as `command-nightly`)
+
 ## roadmap
 
 ### vendor support
