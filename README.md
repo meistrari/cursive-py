@@ -170,7 +170,7 @@ cursive = Cursive(
 
 ### vendor support
 - [x] Anthropic
-- [ ] Cohere
+- [x] Cohere
 - [ ] Azure OpenAI models
 - [ ] Huggingface 
 - [ ] Replicate 
