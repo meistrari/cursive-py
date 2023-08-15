@@ -156,7 +156,7 @@ You can configure this behavior by passing the `retry` and `expand` options to `
 cursive = Cursive(
     max_retries=5, # 0 disables it completely
     expand={
-        'enable': true,
+        'enable': True,
         'defaults_to': 'gpt-3.5-turbo-16k',
         'model_mapping': {
             'gpt-3.5-turbo': 'gpt-3.5-turbo-16k',
