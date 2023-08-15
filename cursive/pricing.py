@@ -5,10 +5,12 @@ from .utils import destructure_items
 
 from .assets.price.anthropic import ANTHROPIC_PRICING
 from .assets.price.openai import OPENAI_PRICING
+from .assets.price.cohere import COHERE_PRICING
 
 VENDOR_PRICING = {
     'openai': OPENAI_PRICING,
-    'anthropic': ANTHROPIC_PRICING
+    'anthropic': ANTHROPIC_PRICING,
+    'cohere': COHERE_PRICING
 }
 
 def resolve_pricing(

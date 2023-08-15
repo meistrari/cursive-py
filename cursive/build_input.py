@@ -55,12 +55,7 @@ def get_function_call_directives(functions: list[CursiveFunction]) -> str:
         
         If you need to use a function, always output the result of the function call using the <function-call> tag using the following format:
         <function-call>
-        {'{'}
-            "name": "function_name",
-            "arguments": {'{'}
-                "argument_name": "argument_value"
-            {'}'}
-        {'}'}
+        {'{'}"name": "function_name", "arguments": {'{'}"argument_name": "argument_value"{'}'}{'}'}
         </function-call>
         Never escape the function call, always output it as it is.
         ALWAYS use this format, even if the function doesn't have arguments. The arguments prop is always a dictionary.

@@ -8,7 +8,8 @@ from anthropic import APIError
 
 from cursive.build_input import get_function_call_directives
 from cursive.function import parse_custom_function_call
-from cursive.vendor.cohere import CohereClient
+from cursive.usage.cohere import get_cohere_usage
+from cursive.vendor.cohere import CohereClient, process_cohere_stream
 
 from .custom_types import (
     BaseModel,
@@ -346,12 +347,7 @@ def create_completion(
             )
         
 
-        data = {
-            'choices': [{ 'message': { 'content': response.completion.lstrip() } }],
-            'model': payload.model,
-            'id': random_id(),
-            'usage': {},
-        }
+        
         if payload.stream:
             data = process_anthropic_stream(
                 payload=payload,
@@ -359,6 +355,13 @@ def create_completion(
                 response=response,
                 on_token=on_token,
             )
+        else:
+            data = {
+                'choices': [{ 'message': { 'content': response.completion.lstrip() } }],
+                'model': payload.model,
+                'id': random_id(),
+                'usage': {},
+            }
 
         parse_custom_function_call(data, payload, get_anthropic_usage)
 
@@ -380,19 +383,33 @@ def create_completion(
                 code=CursiveErrorCode.completion_error
             )
         
-        data = {
-            'choices': [{ 'message': { 'content': response.data[0].text.lstrip() } }],
-            'model': payload.model,
-            'id': random_id(),
-            'usage': {},
-        }
-        
         if payload.stream:
             # TODO: Implement stream processing for Cohere
-            pass
+            data = process_cohere_stream(
+                payload=payload,
+                cursive=cursive,
+                response=response,
+                on_token=on_token,
+            )
+        else:
+            data = {
+                'choices': [{ 'message': { 'content': response.data[0].text.lstrip() } }],
+                'model': payload.model,
+                'id': random_id(),
+                'usage': {},
+            }
 
-        parse_custom_function_call(data, payload)
+        parse_custom_function_call(data, payload, get_cohere_usage)
 
+        data['cost'] = resolve_pricing(
+            vendor='cohere',
+            usage=CursiveAskUsage(
+                completion_tokens=data['usage']['completion_tokens'],
+                prompt_tokens=data['usage']['prompt_tokens'],
+                total_tokens=data['usage']['total_tokens'],
+            ),
+            model=data['model']
+        )
     end = time.time()
 
     if data.get('error'):
