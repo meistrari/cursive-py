@@ -5,7 +5,6 @@ from .custom_types import (
     CursiveError,
     CursiveErrorCode,
     CursiveEnrichedAnswer,
-    CursiveAvailableModels,
     CompletionMessage,
     CursiveFunction,
 )
@@ -17,7 +16,6 @@ __all__ = [
     'CursiveError',
     'CursiveErrorCode',
     'CursiveEnrichedAnswer',
-    'CursiveAvailableModels',
     'CompletionMessage',
     'CursiveFunction',
 ]

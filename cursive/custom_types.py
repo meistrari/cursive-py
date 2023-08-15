@@ -2,17 +2,13 @@ from enum import Enum
 from typing import Any, Callable, Literal, Optional
 
 from pydantic import BaseModel as PydanticBaseModel
+from cursive.function import CursiveFunction
 
 from cursive.utils import random_id
 
 class BaseModel(PydanticBaseModel):
     class Config:
         arbitrary_types_allowed = True
-
-class CursiveFunction(BaseModel):
-    function_schema: dict[str, Any]
-    definition: Callable
-    pause: Optional[bool] = None
 
 class CursiveAskUsage(BaseModel):
     completion_tokens: int
@@ -53,15 +49,6 @@ class CursiveSetupOptionsExpand(BaseModel):
     defaults_to: Optional[str] = None
     model_mapping: Optional[dict[str, str]] = None
 
-CursiveAvailableModels = Literal[
-    # OpenAI
-    'gpt-3.5-turbo',
-    'gpt-4',
-    # Anthropic
-    'claude-instant-1',
-    'claude-2',
-]
-
 class CursiveErrorCode(Enum):
     function_call_error = 'function_call_error',
     completion_error = 'completion_error',
@@ -97,7 +84,7 @@ class CursiveEnrichedAnswer(BaseModel):
 CursiveAskOnToken = Callable[[dict[str, Any]], None]
 
 class CursiveAskOptionsBase(BaseModel):
-    model: Optional[CursiveAvailableModels] = None
+    model: Optional[str] = None
     system_message: Optional[str] = None
     functions: Optional[list[CursiveFunction]] = None
     function_call: Optional[str | CursiveFunction] = None
@@ -161,6 +148,7 @@ class CompletionPayload(BaseModel):
     frequency_penalty: Optional[float] = None
     logit_bias: Optional[dict[str, float]] = None
     user: Optional[str] = None
+    other: Optional[dict[str, Any]] = None
 
 CursiveHook = Literal[
     'embedding:before',

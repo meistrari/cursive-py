@@ -7,11 +7,12 @@ import openai as openai_client
 from anthropic import APIError
 
 from cursive.build_input import get_function_call_directives
-from cursive.function import parse_custom_function_call
+from cursive.custom_function_call import parse_custom_function_call
+from cursive.stream import StreamTransformer
 from cursive.usage.cohere import get_cohere_usage
 from cursive.vendor.cohere import CohereClient, process_cohere_stream
 
-from .custom_types import (
+from cursive.custom_types import (
     BaseModel,
     CompletionMessage,
     CompletionPayload,
@@ -20,7 +21,6 @@ from .custom_types import (
     CursiveAskModelResponse,
     CursiveAskOnToken,
     CursiveAskUsage,
-    CursiveAvailableModels,
     CursiveEnrichedAnswer,
     CursiveError,
     CursiveErrorCode,
@@ -30,17 +30,18 @@ from .custom_types import (
     CursiveSetupOptions,
     CursiveSetupOptionsExpand,
 )
-from .hookable import create_debugger, create_hooks
-from .pricing import resolve_pricing
-from .usage.anthropic import get_anthropic_usage
-from .usage.openai import get_openai_usage
-from .utils import filter_null_values, random_id, resguard
-from .vendor.anthropic import (
+from cursive.hookable import create_debugger, create_hooks
+from cursive.pricing import resolve_pricing
+from cursive.usage.anthropic import get_anthropic_usage
+from cursive.usage.openai import get_openai_usage
+from cursive.utils import filter_null_values, random_id, resguard
+from cursive.vendor.anthropic import (
     AnthropicClient,
     process_anthropic_stream,
 )
-from .vendor.index import resolve_vendor_from_model
-from .vendor.openai import process_openai_stream
+from cursive.vendor.index import resolve_vendor_from_model
+from cursive.vendor.openai import process_openai_stream
+from cursive.vendor.replicate import ReplicateClient
 
 # TODO: Improve implementation architecture, this was a quick and dirty
 class Cursive:
@@ -54,6 +55,7 @@ class Cursive:
         openai: Optional[dict[str, Any]] = None,
         anthropic: Optional[dict[str, Any]] = None,
         cohere: Optional[dict[str, Any]] = None,
+        replicate: Optional[dict[str, Any]] = None,
     ):
         openai_client.api_key = (openai or {}).get('api_key') or \
             os.environ.get('OPENAI_API_KEY')
@@ -61,12 +63,15 @@ class Cursive:
             os.environ.get('ANTHROPIC_API_KEY'))
         cohere_client = CohereClient((cohere or {}).get('api_key') or \
             os.environ.get('CO_API_KEY', '---'))
+        replicate_client = ReplicateClient((replicate or {}).get('api_key') or \
+            os.environ.get('REPLICATE_API_TOKEN', '---'))
 
         self._hooks = create_hooks()
         self._vendor = CursiveVendors(
             openai=openai_client,
             anthropic=anthropic_client,
             cohere=cohere_client,
+            replicate=replicate_client,
         )
         self.options = CursiveSetupOptions(
             max_retries=max_retries,
@@ -84,7 +89,7 @@ class Cursive:
     
     def ask(
         self,
-        model: Optional[CursiveAvailableModels] = None,
+        model: Optional[str] = None,
         system_message: Optional[str] = None,
         functions: Optional[list[CursiveFunction]] = None,
         function_call: Optional[str | CursiveFunction] = None,
@@ -191,7 +196,7 @@ class Cursive:
 
 
 def resolve_options(
-    model: Optional[CursiveAvailableModels] = None,
+    model: Optional[str] = None,
     system_message: Optional[str] = None,
     functions: Optional[list[CursiveFunction]] = None,
     function_call: Optional[str | CursiveFunction] = None,
@@ -346,12 +351,9 @@ def create_completion(
                 code=CursiveErrorCode.completion_error
             )
         
-
-        
         if payload.stream:
             data = process_anthropic_stream(
                 payload=payload,
-                cursive=cursive,
                 response=response,
                 on_token=on_token,
             )
@@ -387,13 +389,14 @@ def create_completion(
             # TODO: Implement stream processing for Cohere
             data = process_cohere_stream(
                 payload=payload,
-                cursive=cursive,
                 response=response,
                 on_token=on_token,
             )
         else:
             data = {
-                'choices': [{ 'message': { 'content': response.data[0].text.lstrip() } }],
+                'choices': [
+                    { 'message': { 'content': response.data[0].text.lstrip() } }
+                ],
                 'model': payload.model,
                 'id': random_id(),
                 'usage': {},
@@ -410,6 +413,39 @@ def create_completion(
             ),
             model=data['model']
         )
+    elif vendor == 'replicate':
+        response, error = cursive._vendor.replicate.create_completion(payload)
+        if error:
+            raise CursiveError(
+                message=error,
+                details=error,
+                code=CursiveErrorCode.completion_error
+            )
+        # TODO: Implement stream processing for Replicate
+        stream_transformer = StreamTransformer(
+            on_token=on_token,
+            payload=payload,
+            response=response,
+        )
+
+        def get_current_token(part):
+            part.value = part.value
+
+        stream_transformer.on('get_current_token', get_current_token)
+
+        data = stream_transformer.process()
+
+        parse_custom_function_call(data, payload)
+
+        # data['cost'] = resolve_pricing(
+        #     vendor='cohere',
+        #     usage=CursiveAskUsage(
+        #         completion_tokens=data['usage']['completion_tokens'],
+        #         prompt_tokens=data['usage']['prompt_tokens'],
+        #         total_tokens=data['usage']['total_tokens'],
+        #     ),
+        #     model=data['model']
+        # )
     end = time.time()
 
     if data.get('error'):
@@ -428,10 +464,9 @@ def create_completion(
     cursive._hooks.call_hook('completion:after', hook_payload)
     return CreateChatCompletionResponseExtended(**data)
 
-
 def ask_model(
     cursive,
-    model: Optional[CursiveAvailableModels] = None,
+    model: Optional[str] = None,
     system_message: Optional[str] = None,
     functions: Optional[list[CursiveFunction]] = None,
     function_call: Optional[str | CursiveFunction] = None,
@@ -472,7 +507,6 @@ def ask_model(
     )
     start = time.time()
 
-    
     functions = functions or []
 
     if (type(function_call) == CursiveFunction):
@@ -496,47 +530,53 @@ def ask_model(
                 details=error,
                 code=CursiveErrorCode.unknown_error
             ) from error
-        print(error)
-        cause = error.details.code or error.details.type
-        if (cause == 'context_length_exceeded'):
-            if (
-                not cursive.expand
-                or (cursive.expand and cursive.expand.enabled)
-            ):
-                default_model = (
-                    (
-                        cursive.expand
-                        and cursive.expand.defaultsTo
+        try:
+            cause = error.details.code or error.details.type
+            if (cause == 'context_length_exceeded'):
+                if (
+                    not cursive.expand
+                    or (cursive.expand and cursive.expand.enabled)
+                ):
+                    default_model = (
+                        (
+                            cursive.expand
+                            and cursive.expand.defaultsTo
+                        )
+                        or 'gpt-3.5-turbo-16k'
                     )
-                    or 'gpt-3.5-turbo-16k'
-                )
-                model_mapping = (
-                    (
-                        cursive.expand
-                        and cursive.expand.model_mapping
+                    model_mapping = (
+                        (
+                            cursive.expand
+                            and cursive.expand.model_mapping
+                        )
+                        or {}
                     )
-                    or {}
+                    resolved_model = model_mapping[model] or default_model
+                    completion, error = resguard(
+                        lambda: create_completion(
+                            payload={ **payload, 'model': resolved_model },
+                            cursive=cursive,
+                            on_token=on_token,
+                        ),
+                        CursiveError,
+                    )
+            elif cause == 'invalid_request_error':
+                raise CursiveError(
+                    message='Invalid request',
+                    details=error.details,
+                    code=CursiveErrorCode.invalid_request_error,
                 )
-                resolved_model = model_mapping[model] or default_model
-                completion, error = resguard(
-                    lambda: create_completion(
-                        payload={ **payload, 'model': resolved_model },
-                        cursive=cursive,
-                        on_token=on_token,
-                    ),
-                    CursiveError,
-                )
-        elif cause == 'invalid_request_error':
-            raise CursiveError(
-                message='Invalid request',
-                details=error.details,
-                code=CursiveErrorCode.invalid_request_error,
+        except Exception as e:
+            error = CursiveError(
+                message=f'Unknown error: {e}',
+                details=e,
+                code=CursiveErrorCode.unknown_error
             )
 
         # TODO: Handle other errors
         if error:
             # TODO: Add a more comprehensive retry strategy
-            for i in range(cursive.max_retries):
+            for i in range(cursive.options.max_retries or 0):
                 completion, error = resguard(
                     lambda: create_completion(
                         payload=payload,
@@ -660,7 +700,7 @@ def ask_model(
 
 def build_answer(
     cursive,
-    model: Optional[CursiveAvailableModels] = None,
+    model: Optional[str] = None,
     system_message: Optional[str] = None,
     functions: Optional[list[CursiveFunction]] = None,
     function_call: Optional[str | CursiveFunction] = None,
@@ -705,7 +745,7 @@ def build_answer(
     )
 
     if error:
-        CursiveEnrichedAnswer(
+        return CursiveEnrichedAnswer(
             error=error,
             usage=None,
             model=model or 'gpt-3.5-turbo',
@@ -749,7 +789,7 @@ class CursiveConversation:
         
     def ask(
         self,
-        model: Optional[CursiveAvailableModels] = None,
+        model: Optional[str] = None,
         system_message: Optional[str] = None,
         functions: Optional[list[CursiveFunction]] = None,
         function_call: Optional[str | CursiveFunction] = None,
@@ -885,3 +925,4 @@ class CursiveVendors(BaseModel):
     openai: Optional[Any] = None
     anthropic: Optional[AnthropicClient] = None
     cohere: Optional[CohereClient] = None
+    replicate: Optional[ReplicateClient] = None

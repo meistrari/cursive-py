@@ -1,10 +1,10 @@
-import re
 from typing import Any, Optional
 from cohere import Client as Cohere
 from cursive.build_input import build_completion_input
 
 from cursive.custom_types import CompletionPayload, CursiveAskOnToken
-from cursive.utils import filter_null_values, random_id
+from cursive.stream import StreamTransformer
+from cursive.utils import filter_null_values
 
 class CohereClient:
     client: Cohere
@@ -16,11 +16,14 @@ class CohereClient:
         prompt = build_completion_input(payload.messages)
         payload = filter_null_values({ 
             'model': payload.model,
-            'max_tokens': payload.max_tokens or 3000,
+            'max_tokens': payload.max_tokens 
+                or 3000,
             'prompt': prompt.rstrip(),
-            'temperature': payload.temperature if payload.temperature is not None else 0.7,
+            'temperature': payload.temperature if payload.temperature is not None 
+                else 0.7,
             'stop_sequences': payload.stop,
-            'stream': payload.stream or False,
+            'stream': payload.stream 
+                or False,
             'frequency_penalty': payload.frequency_penalty,
             'p': payload.top_p,
         })
@@ -33,137 +36,20 @@ class CohereClient:
         except Exception as e:
             return None, e
 
-
-
-
 def process_cohere_stream(
     payload: CompletionPayload,
-    cursive: Any,
     response: Any,
     on_token: Optional[CursiveAskOnToken] = None,
 ):
-    data = {
-        'choices': [{ 'message': { 'content': '' } }],
-        'usage': {
-            'completion_tokens': 0,
-            'prompt_tokens': 0,
-        },
-        'model': payload.model,
-    }
+    stream_transformer = StreamTransformer(
+        on_token=on_token,
+        payload=payload,
+        response=response,
+    )
 
-    completion = ''
-    for slice in response:
-        data = {
-            **data,
-            'id': random_id(),
-        }
+    def get_current_token(part):
+        part.value = part.value.text
 
-        # The completion partial will come with a leading whitespace
-        completion += slice.text
-        if not data['choices'][0]['message']['content']:
-            completion = completion.lstrip()
+    stream_transformer.on('get_current_token', get_current_token)
 
-        # Check if theres any <function-call> tag. The regex should allow for nested tags
-        function_call_tag = re.findall(
-            r'<function-call>([\s\S]*?)(?=<\/function-call>|$)',
-            completion
-        )
-        function_name = ''
-        function_arguments = ''
-        if len(function_call_tag) > 0:
-            # Remove <function-call> starting and ending tags, even if the ending tag is partial or missing
-            function_call = re.sub(
-                    r'^\n|\n$',
-                    '',
-                    re.sub(
-                        r'<\/?f?u?n?c?t?i?o?n?-?c?a?l?l?>?',
-                        '',
-                        function_call_tag[0]
-                    ).strip()
-                ).strip()
-            # Match the function name inside the JSON
-            function_name_matches = re.findall(
-                r'"name":\s*"(.+)"',
-                function_call
-            )
-            function_name = len(function_name_matches) > 0 and function_name_matches[0]
-            function_arguments_matches = re.findall(
-                r'"arguments":\s*(\{.+)\}?',
-                function_call,
-                re.S
-            )
-            function_arguments = (
-                len(function_arguments_matches) > 0 and
-                function_arguments_matches[0]
-            )
-            if function_arguments:
-                # If theres unmatches } at the end, remove them
-                unmatched_brackets = re.findall(
-                    r'(\{|\})',
-                    function_arguments
-                )
-                if len(unmatched_brackets) % 2:
-                    function_arguments = re.sub(
-                        r'\}$',
-                        '',
-                        function_arguments.strip()
-                    )
-
-                function_arguments = function_arguments.strip()
-
-        cursive_answer_tag = re.findall(
-            r'<cursive-answer>([\s\S]*?)(?=<\/cursive-answer>|$)',
-            completion
-        )
-        tagged_answer = ''
-        if cursive_answer_tag:
-            tagged_answer = re.sub(
-                r'<\/?c?u?r?s?i?v?e?-?a?n?s?w?e?r?>?',
-                '',
-                cursive_answer_tag[0]
-            ).lstrip()
-
-        current_token = completion[
-            len(data['choices'][0]['message']['content']):
-        ]
-
-        data['choices'][0]['message']['content'] += current_token
-
-        if on_token:
-            chunk = None
-
-            if payload.functions:
-                if function_name:
-                    chunk = {
-                        'function_call': {},
-                        'content': None,
-                    }
-                    if function_arguments:
-                        # Remove all but the current token from the arguments
-                        chunk['function_call']['arguments'] = function_arguments
-                    else:
-                        chunk['function_call'] = {
-                            'name': function_name,
-                            'arguments': '',
-                        }
-                elif tagged_answer:
-                    # Token is at the end of the tagged answer
-                    regex = fr'(.*){current_token.strip()}$'
-                    match = re.findall(
-                        regex,
-                        tagged_answer
-                    )
-                    if len(match) > 0 and current_token:
-                        chunk = {
-                            'function_call': None,
-                            'content': current_token,
-                        }
-            else:
-                chunk = {
-                    'content': current_token,
-                }
-
-            if chunk:
-                on_token(chunk)
-
-    return data
+    return stream_transformer.process()

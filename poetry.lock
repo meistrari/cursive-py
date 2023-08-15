@@ -861,6 +861,25 @@ files = [
 ]
 
 [[package]]
+name = "replicate"
+version = "0.11.0"
+description = "Python client for Replicate"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "replicate-0.11.0-py3-none-any.whl", hash = "sha256:fbb8815068864dc822cd4fa7b6103d6f4089d6ef122abd6c3441ca0f0f110c46"},
+    {file = "replicate-0.11.0.tar.gz", hash = "sha256:4d54b5838c1552a6f76cc37c3af8d9a7998105382082d672acad31636ad443b5"},
+]
+
+[package.dependencies]
+packaging = "*"
+pydantic = ">1"
+requests = ">2"
+
+[package.extras]
+dev = ["black", "mypy", "pytest", "responses", "ruff"]
+
+[[package]]
 name = "requests"
 version = "2.31.0"
 description = "Python HTTP for Humans."
@@ -1155,4 +1174,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.9,<3.12"
-content-hash = "56b699ca6fc6bdbd0d78fd1988e81a1b192140649acca4a2368ed82aedf28822"
+content-hash = "864c2ea8a9810fb1c1c1637019a81cb45714e8d220338446f49ab817b23ab2aa"
