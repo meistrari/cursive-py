@@ -30,7 +30,7 @@ pip install cursivepy
 ```python
 from cursive import Cursive
 
-const cursive = Cursive()
+cursive = Cursive()
 
 response = cursive.ask(
     prompt='What is the meaning of life?',
