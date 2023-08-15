@@ -3,8 +3,6 @@
 
 Cursive is a universal and intuitive framework for interacting with LLMs.
 
-It works in any JavaScript runtime and has a heavy focus on extensibility and developer experience.
-
 ## highlights
 <img width=14 height=0 src=""/>✦ **Extensible** - You can easily hook into any part of a completion life cycle. Be it to log, cache, or modify the results.
 
