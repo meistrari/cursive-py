@@ -8,7 +8,7 @@ Cursive is a universal and intuitive framework for interacting with LLMs.
 
 <img width=14 height=0 src=""/>✦ **Functions** - Easily describe functions that the LLM can use along with its definition, with any model (currently supporting GPT-4, GPT-3.5, Claude 2, and Claude Instant)
 
-<img width=14 height=0 src=""/>✦ **Universal** - Cursive's goal is to bridge as many capabilities between different models as possible. Ultimately, this means that with a single interface, you can allow your users to choose any model.
+<img width=14 height=0 src=""/>✦ **Universal** - Cursive aims to bridge as many capabilities between different models as possible. Ultimately, this means that with a single interface, you can allow your users to choose any model.
 
 <img width=14 height=0 src=""/>✦ **Informative** - Cursive comes with built-in token usage and costs calculations, as accurate as possible.
 
@@ -50,7 +50,7 @@ res_a = cursive.ask(
 
 print(res_a.answer) # Zephyr
 
-res_b = res_b.conversation.ask(
+res_b = res_a.conversation.ask(
     prompt='How would you say it in Portuguese?'
 )
 
