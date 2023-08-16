@@ -10,10 +10,24 @@ class BaseModel(PydanticBaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+class CursiveModel(Enum):
+    GPT4 = "gpt4"
+    GPT4_32K = "gpt4-32k"
+    GPT3_5_TURBO = "gpt-3.5-turbo"
+    GPT3_5_TURBO_16K = "gpt-3.5-turbo-16k"
+    CLAUDE_2 = "claude-2"
+    CLAUDE_INSTANT_1_2 = "claude-instant-1.2"
+    CLAUDE_INSTANT_1 = "claude-instant-2.2"
+    COMMAND = "command"
+    COMMAND_NIGHTLY = "command-nightly"
+
 class CursiveAskUsage(BaseModel):
     completion_tokens: int
     prompt_tokens: int
     total_tokens: int
+
+
+
 
 class CursiveAskCost(BaseModel):
     completion: float
@@ -84,20 +98,20 @@ class CursiveEnrichedAnswer(BaseModel):
 CursiveAskOnToken = Callable[[dict[str, Any]], None]
 
 class CursiveAskOptionsBase(BaseModel):
-    model: Optional[str] = None
+    model: Optional[str | CursiveModel] = None
     system_message: Optional[str] = None
     functions: Optional[list[CursiveFunction]] = None
     function_call: Optional[str | CursiveFunction] = None
     on_token: Optional[CursiveAskOnToken] = None
     max_tokens: Optional[int] = None
     stop: Optional[list[str]] = None
-    temperature: Optional[int] = None
-    top_p: Optional[int] = None
-    presence_penalty: Optional[int] = None
-    frequency_penalty: Optional[int] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    presence_penalty: Optional[float] = None
+    frequency_penalty: Optional[float] = None
     best_of: Optional[int] = None
     n: Optional[int] = None
-    logit_bias: Optional[dict[str, int]] = None
+    logit_bias: Optional[dict[str, float]] = None
     user: Optional[str] = None
     stream: Optional[bool] = None
 
@@ -179,3 +193,4 @@ class CursiveHookPayload():
         self.data = data
         self.error = error
         self.duration = duration
+

@@ -29,6 +29,7 @@ from cursive.custom_types import (
     CursiveHookPayload,
     CursiveSetupOptions,
     CursiveSetupOptionsExpand,
+    CursiveModel,
 )
 from cursive.hookable import create_debugger, create_hooks
 from cursive.pricing import resolve_pricing
@@ -89,7 +90,7 @@ class Cursive:
     
     def ask(
         self,
-        model: Optional[str] = None,
+        model: Optional[str | CursiveModel] = None,
         system_message: Optional[str] = None,
         functions: Optional[list[CursiveFunction]] = None,
         function_call: Optional[str | CursiveFunction] = None,
@@ -108,6 +109,8 @@ class Cursive:
         messages: Optional[list[CompletionMessage]] = None,
         prompt: Optional[str] = None,
     ):
+        model = model.value if isinstance(model, CursiveModel) else model
+        
         result = build_answer(
             cursive=self,
             model=model,
@@ -196,7 +199,7 @@ class Cursive:
 
 
 def resolve_options(
-    model: Optional[str] = None,
+    model: Optional[str | CursiveModel] = None,
     system_message: Optional[str] = None,
     functions: Optional[list[CursiveFunction]] = None,
     function_call: Optional[str | CursiveFunction] = None,
@@ -217,12 +220,12 @@ def resolve_options(
 ):
     functions = functions or []
     messages = messages or []
-    model = model or 'gpt-3.5-turbo-0613'
+    model = model or 'gpt-3.5-turbo'
 
     # TODO: Add support for function call resolving
     vendor = resolve_vendor_from_model(model)
     resolved_system_message = ''
-    if  vendor in ['anthropic', 'cohere'] and len(functions) > 0:
+    if  vendor in ['anthropic', 'cohere', 'replicate'] and len(functions) > 0:
         resolved_system_message = (
             (system_message or '')
             + '\n\n'
@@ -384,7 +387,6 @@ def create_completion(
                 details=error,
                 code=CursiveErrorCode.completion_error
             )
-        
         if payload.stream:
             # TODO: Implement stream processing for Cohere
             data = process_cohere_stream(
@@ -436,16 +438,6 @@ def create_completion(
         data = stream_transformer.process()
 
         parse_custom_function_call(data, payload)
-
-        # data['cost'] = resolve_pricing(
-        #     vendor='cohere',
-        #     usage=CursiveAskUsage(
-        #         completion_tokens=data['usage']['completion_tokens'],
-        #         prompt_tokens=data['usage']['prompt_tokens'],
-        #         total_tokens=data['usage']['total_tokens'],
-        #     ),
-        #     model=data['model']
-        # )
     end = time.time()
 
     if data.get('error'):
@@ -466,20 +458,20 @@ def create_completion(
 
 def ask_model(
     cursive,
-    model: Optional[str] = None,
+    model: Optional[str | CursiveModel] = None,
     system_message: Optional[str] = None,
     functions: Optional[list[CursiveFunction]] = None,
     function_call: Optional[str | CursiveFunction] = None,
     on_token: Optional[CursiveAskOnToken] = None,
     max_tokens: Optional[int] = None,
     stop: Optional[list[str]] = None,
-    temperature: Optional[int] = None,
-    top_p: Optional[int] = None,
-    presence_penalty: Optional[int] = None,
-    frequency_penalty: Optional[int] = None,
+    temperature: Optional[float] = None,
+    top_p: Optional[float] = None,
+    presence_penalty: Optional[float] = None,
+    frequency_penalty: Optional[float] = None,
     best_of: Optional[int] = None,
     n: Optional[int] = None,
-    logit_bias: Optional[dict[str, int]] = None,
+    logit_bias: Optional[dict[str, float]] = None,
     user: Optional[str] = None,
     stream: Optional[bool] = None,
     messages: Optional[list[CompletionMessage]] = None,
@@ -629,14 +621,14 @@ def ask_model(
                 'cursive': cursive,
             })
 
-        try:
-            name = func_call['name']
-            called_function = next((func for func in payload.functions if func['name'] == name), None)
-            arguments = json.loads(func_call['arguments'] or '{}')
-            if called_function:
-                props = called_function['parameters']['properties']
-                for k, v in props.items():
-                    if k in arguments:
+        name = func_call['name']
+        called_function = next((func for func in payload.functions if func['name'] == name), None)
+        arguments = json.loads(func_call['arguments'] or '{}')
+        if called_function:
+            props = called_function['parameters']['properties']
+            for k, v in props.items():
+                if k in arguments:
+                    try:
                         arg_type = v['type']
                         if arg_type == 'string':
                             arguments[k] = str(arguments[k])
@@ -646,12 +638,8 @@ def ask_model(
                             arguments[k] = int(arguments[k])
                         elif arg_type == 'boolean':
                             arguments[k] = bool(arguments[k])
-        except Exception as e:
-            raise CursiveError(
-                message=f'Error while parsing function arguments for ${func_call["name"]}',
-                details=e,
-                code=CursiveErrorCode.function_call_error,
-            )
+                    except Exception:
+                        pass
 
         function_result, error = resguard(
             lambda: function_definition.definition(**arguments),
@@ -700,7 +688,7 @@ def ask_model(
 
 def build_answer(
     cursive,
-    model: Optional[str] = None,
+    model: Optional[str | CursiveModel] = None,
     system_message: Optional[str] = None,
     functions: Optional[list[CursiveFunction]] = None,
     function_call: Optional[str | CursiveFunction] = None,
@@ -789,7 +777,7 @@ class CursiveConversation:
         
     def ask(
         self,
-        model: Optional[str] = None,
+        model: Optional[str | CursiveModel] = None,
         system_message: Optional[str] = None,
         functions: Optional[list[CursiveFunction]] = None,
         function_call: Optional[str | CursiveFunction] = None,
@@ -869,7 +857,7 @@ E = TypeVar("E", None, CursiveError)
 class CursiveAnswer(Generic[E]):
     choices: Optional[list[str]]
     id: Optional[str]
-    model: Optional[str]
+    model: Optional[str | CursiveModel]
     usage: Optional[CursiveAskUsage]
     cost: Optional[CursiveAskCost]
     error: Optional[E]

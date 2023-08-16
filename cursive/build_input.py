@@ -51,15 +51,15 @@ def build_completion_input(messages: list[CompletionMessage]):
 def get_function_call_directives(functions: list[CursiveFunction]) -> str:
     return trim(f'''
         # Function Calling Guide
-        You're a powerful language model capable of using functions to do anything the user needs.
+        You're a powerful language model capable of calling functions to do anything the user needs.
         
-        If you need to use a function, always output the result of the function call using the <function-call> tag using the following format:
+        If you need to call a function, you output the name and arguments of the function you want to use in the following format:
+        
         <function-call>
         {'{'}"name": "function_name", "arguments": {'{'}"argument_name": "argument_value"{'}'}{'}'}
         </function-call>
-        Never escape the function call, always output it as it is.
-        ALWAYS use this format, even if the function doesn't have arguments. The arguments prop is always a dictionary.
-
+        ALWAYS use this format, even if the function doesn't have arguments. The arguments property is always a dictionary.
+        Never forget to pass the `name` and `arguments` property when doing a function call.
 
         Think step by step before answering, and try to think out loud. Never output a function call if you don't have to.
         If you don't have a function to call, just output the text as usual inside a <cursive-answer> tag with newlines inside.
@@ -79,13 +79,10 @@ def get_function_call_directives(functions: list[CursiveFunction]) -> str:
         {'{'}result{'}'}
         </function-result>
 
-        If you try to provide a function result, you will be eliminated.
+        ## Important note
+        Never output a <function-result>, or you will be eliminated.
 
         You can use the result of the function call in your answer. But never answer and call a function at the same time.
         When answering never be explicit about the function calling, just use the result of the function call in your answer.
-        Remember, the user can't see the function calling, so don't mention function results or calls.
 
-        If you answer with a <cursive-think> block, you always need to use either a <cursive-answer> or a <function-call> block as well.
-        If you don't, you will be eliminated and the world will catch fire.
-        This is extremely important.
     ''')

@@ -6,14 +6,13 @@ from cursive.utils import random_id
 
 
 class StreamTransformer:
-    _hooks = create_hooks()
-
     def __init__(
         self, 
         payload: CompletionPayload,
         response: Any,
         on_token: Optional[CursiveAskOnToken] = None,
     ):
+        self._hooks = create_hooks()
         self.payload = payload
         self.response = response
         self.on_token = on_token

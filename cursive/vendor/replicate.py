@@ -22,6 +22,8 @@ class ReplicateClient:
             'top_p': payload.top_p,
             'stop': payload.stop,
             'model': version,
+            'stream': bool(payload.stream),
+            **(payload.other or {})
         })
         try:
             response = self.client.run(
