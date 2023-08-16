@@ -171,6 +171,8 @@ cursive = Cursive(
 - `gpt-4`
 - `gpt-4-32k`
 - Any other chat completion model version
+###### Credentials
+You can pass your OpenAI API key to `Cursive`'s constructor, or set the `OPENAI_API_KEY` environment variable.
 
 ##### Anthropic
 - `claude-2`
@@ -178,15 +180,34 @@ cursive = Cursive(
 - `claude-instant-1.2`
 - Any other model version
 
-##### Anthropic
+###### Credentials
+You can pass your Anthropic API key to `Cursive`'s constructor, or set the `ANTHROPIC_API_KEY` environment variable.
+
+##### Cohere
 - `command`
 - Any other model version (such as `command-nightly`)
 
+###### Credentials
+You can pass your Cohere API key to `Cursive`'s constructor, or set the `COHERE_API_KEY` environment variable.
+
+##### Replicate
+You can prepend `replicate/` to any model name and version available on Replicate.
+
+###### Example
+```python
+cursive.ask(
+    prompt='What is the meaning of life?',
+    model='replicate/a16z-infra/llama-2-13b-chat:2a7f981751ec7fdf87b5b91ad4db53683a98082e9ff7bfd12c8cd5ea85980a52',
+)
+```
+
+###### Credentials
+You can pass your Replicate API key to `Cursive`'s constructor, or set the `REPLICATE_API_TOKEN` environment variable.
 ## roadmap
 
 ### vendor support
 - [x] Anthropic
 - [x] Cohere
+- [x] Replicate 
 - [ ] Azure OpenAI models
 - [ ] Huggingface 
-- [ ] Replicate 
