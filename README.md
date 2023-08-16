@@ -165,7 +165,7 @@ cursive = Cursive(
 ```
 
 ## available models
-##### OpenAI
+#### OpenAI
 - `gpt-3.5-turbo`
 - `gpt-3.5-turbo-16k`
 - `gpt-4`
@@ -174,7 +174,7 @@ cursive = Cursive(
 ###### Credentials
 You can pass your OpenAI API key to `Cursive`'s constructor, or set the `OPENAI_API_KEY` environment variable.
 
-##### Anthropic
+#### Anthropic
 - `claude-2`
 - `claude-instant-1`
 - `claude-instant-1.2`
@@ -183,14 +183,14 @@ You can pass your OpenAI API key to `Cursive`'s constructor, or set the `OPENAI_
 ###### Credentials
 You can pass your Anthropic API key to `Cursive`'s constructor, or set the `ANTHROPIC_API_KEY` environment variable.
 
-##### Cohere
+#### Cohere
 - `command`
 - Any other model version (such as `command-nightly`)
 
 ###### Credentials
 You can pass your Cohere API key to `Cursive`'s constructor, or set the `COHERE_API_KEY` environment variable.
 
-##### Replicate
+#### Replicate
 You can prepend `replicate/` to any model name and version available on Replicate.
 
 ###### Example
