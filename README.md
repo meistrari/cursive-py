@@ -87,7 +87,7 @@ def add(a: float, b: float):
 
 res = cursive.ask(
     prompt='What is the sum of 232 and 243?',
-    functions=[sum],
+    functions=[add],
 )
 
 print(res.answer) # The sum of 232 and 243 is 475.
