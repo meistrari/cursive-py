@@ -148,7 +148,7 @@ This will support different types of documents and integrations pretty soon.
 ### Reliability
 Cursive comes with automatic retry with backoff upon failing completions, and model expanding upon exceeding context length -- which means that it tries again with a model with a bigger context length when it fails by running out of it.
 
-You can configure this behavior by passing the `retry` and `expand` options to `useCursive`.
+You can configure this behavior by passing the `retry` and `expand` options to `Cursive` constructor.
 
 ```python
 cursive = Cursive(
