@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 import json
 import time
 from typing import Any, Callable, Generic, Optional, TypeVar
@@ -641,11 +643,16 @@ def ask_model(
                     except Exception:
                         pass
 
-        function_result, error = resguard(
-            lambda: function_definition.definition(**arguments),
-        )
-
-        if error:
+        is_async = inspect.iscoroutinefunction(function_definition.definition)
+        function_result = None
+        try:
+            if is_async:
+                function_result = asyncio.run(
+                    function_definition.definition(**arguments)
+                )
+            else:
+                function_result = function_definition.definition(**arguments)
+        except Exception as error:
             raise CursiveError(
                 message=f'Error while running function ${func_call["name"]}',
                 details=error,
