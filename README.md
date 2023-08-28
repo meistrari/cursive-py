@@ -194,18 +194,20 @@ OpenRouter is a service that gives you access to leading language models in an O
 ###### Credentials
 
 ```python
-import openai
-import requests
-
-openai.api_key = "sk-or-..."
-openai.api_base = "https://openrouter.ai/api/v1"
-openai.requestssession = requests.Session()
-openai.requestssession.headers.update({"HTTP-Referer": "https://appurl.com", "X-Title": "YOUR_APP_NAME"})
-
 from cursive import Cursive
 
-cursive = Cursive()
-cursive.ask(prompt="What is the meaning of life?", model="anthropic/claude-instant-1.2")
+cursive = Cursive(
+    openrouter={
+      "api_key": "sk-or-...",
+      "app_title": "Your App Name",
+      "app_url": "https://appurl.com",
+    }
+)
+
+cursive.ask(
+    model="anthropic/claude-instant-1.2",
+    prompt="What is the meaning of life?"
+)
 ```
 
 ###### Credentials
