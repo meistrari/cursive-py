@@ -8,15 +8,13 @@ from cursive.custom_types import CompletionMessage
 
 def encode(
     text: str,
-    allowed_special: AbstractSet[str] | Literal['all'] = set(),
-    disallowed_special: Collection[str] | Literal['all'] = "all"
+    allowed_special: AbstractSet[str] | Literal["all"] = set(),
+    disallowed_special: Collection[str] | Literal["all"] = "all",
 ) -> list[int]:
     enc = tiktoken.get_encoding("cl100k_base")
-    
+
     return enc.encode(
-        text,
-        allowed_special=allowed_special,
-        disallowed_special=disallowed_special
+        text, allowed_special=allowed_special, disallowed_special=disallowed_special
     )
 
 
@@ -29,13 +27,13 @@ def get_openai_usage(content: str | list[CompletionMessage]):
 
         token_count = 3
         for message in content:
-            token_count += tokens['per_message']
-            for attribute, value in message.model_dump().items():
-                if attribute == 'name':
-                    token_count += tokens['per_name']
+            token_count += tokens["per_message"]
+            for attribute, value in message.dict().items():
+                if attribute == "name":
+                    token_count += tokens["per_name"]
 
-                if type(value) is dict:
-                    value = json.dumps(value, separators=(',', ':'))
+                if isinstance(value, dict):
+                    value = json.dumps(value, separators=(",", ":"))
 
                 if value is None:
                     continue
@@ -44,25 +42,25 @@ def get_openai_usage(content: str | list[CompletionMessage]):
 
         return token_count
     else:
-        return len(encode(content)) # type: ignore
+        return len(encode(content))  # type: ignore
 
 
 def get_token_count_from_functions(functions: list[dict]):
     token_count = 3
     for fn in functions:
-        function_tokens = len(encode(fn['name']))
-        function_tokens += len(encode(fn['description'])) if fn['description'] else 0
+        function_tokens = len(encode(fn["name"]))
+        function_tokens += len(encode(fn["description"])) if fn["description"] else 0
 
-        if fn['parameters'] and fn['parameters']['properties']:
-            properties = fn['parameters']['properties']
+        if fn["parameters"] and fn["parameters"]["properties"]:
+            properties = fn["parameters"]["properties"]
             for key in properties:
                 function_tokens += len(encode(key))
                 value = properties[key]
                 for field in value:
-                    if field in ['type', 'description']:
+                    if field in ["type", "description"]:
                         function_tokens += 2
                         function_tokens += len(encode(value[field]))
-                    elif field == 'enum':
+                    elif field == "enum":
                         function_tokens -= 3
                         for enum_value in value[field]:
                             function_tokens += 3
@@ -74,4 +72,3 @@ def get_token_count_from_functions(functions: list[dict]):
 
     token_count += 12
     return token_count
-

@@ -64,7 +64,6 @@ class Cursive:
         replicate: Optional[dict[str, Any]] = None,
         openrouter: Optional[dict[str, Any]] = None,
     ):
-
         self._hooks = create_hooks()
         self.options = CursiveSetupOptions(
             max_retries=max_retries,
@@ -97,13 +96,16 @@ class Cursive:
             openai_client.api_key = openrouter_api_key
             self.options.is_using_openrouter = True
             session = requests.Session()
-            session.headers.update({
-                'HTTP-Referer': openrouter.get("app_url", "https://cursive.meistrari.com"),
-                'X-Title': openrouter.get("app_title", "Cursive"),
-            })
+            session.headers.update(
+                {
+                    "HTTP-Referer": openrouter.get(
+                        "app_url", "https://cursive.meistrari.com"
+                    ),
+                    "X-Title": openrouter.get("app_title", "Cursive"),
+                }
+            )
             openai_client.requestssession = session
             atexit.register(session.close)
-
 
         self._vendor = CursiveVendors(
             openai=openai_client,
@@ -249,12 +251,17 @@ def resolve_options(
 
     # Resolve default model
     model = model or (
-        "openai/gpt-3.5-turbo" if cursive.options.is_using_openrouter else "gpt-3.5-turbo"
+        "openai/gpt-3.5-turbo"
+        if cursive.options.is_using_openrouter
+        else "gpt-3.5-turbo"
     )
 
     # TODO: Add support for function call resolving
-    vendor = "openrouter" if cursive.options.is_using_openrouter \
+    vendor = (
+        "openrouter"
+        if cursive.options.is_using_openrouter
         else resolve_vendor_from_model(model)
+    )
 
     resolved_system_message = ""
 
@@ -337,19 +344,20 @@ def create_completion(
     data = {}
     start = time.time()
 
-    vendor = "openrouter" if cursive.options.is_using_openrouter \
+    vendor = (
+        "openrouter"
+        if cursive.options.is_using_openrouter
         else resolve_vendor_from_model(payload.model)
+    )
 
     # TODO:    Improve the completion creation based on model to vendor matching
     if vendor in ["openai", "openrouter"]:
-
-        resolved_payload = filter_null_values(payload.model_dump())
+        resolved_payload = filter_null_values(payload.dict())
 
         # Remove the ID from the messages before sending to OpenAI
         resolved_payload["messages"] = [
-            filter_null_values(
-                delete_keys_from_dict(message, ["id"])
-            ) for message in resolved_payload["messages"]
+            filter_null_values(delete_keys_from_dict(message, ["id", "model_config"]))
+            for message in resolved_payload["messages"]
         ]
 
         response = cursive._vendor.openai.ChatCompletion.create(**resolved_payload)
@@ -711,7 +719,7 @@ def ask_model(
         if function_definition.pause:
             completion.function_result = function_result
             return CursiveAskModelResponse(
-                answer=CreateChatCompletionResponseExtended(**completion.model_dump()),
+                answer=CreateChatCompletionResponseExtended(**completion.dict()),
                 messages=messages,
             )
         else:
