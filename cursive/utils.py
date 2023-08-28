@@ -41,6 +41,10 @@ def trim(content: str) -> str:
     
     return content.strip()
 
+def delete_keys_from_dict(dictionary: dict, keys: list[str]):
+    return {
+        k: v for k, v in dictionary.items() if k not in keys
+    }
 
 T = TypeVar('T', bound=Exception)
 

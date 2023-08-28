@@ -8,7 +8,10 @@ from cursive.utils import random_id
 
 
 class BaseModel(PydanticBaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        protected_namespaces=()
+    )
 
 
 class CursiveModel(Enum):
@@ -65,7 +68,7 @@ class CompletionMessage(BaseModel):
 class CursiveSetupOptionsExpand(BaseModel):
     enabled: Optional[bool] = None
     defaults_to: Optional[str] = None
-    resolve_model: Optional[dict[str, str]] = None
+    model_mapping: Optional[dict[str, str]] = None
 
 
 class CursiveErrorCode(Enum):
@@ -146,6 +149,7 @@ class CursiveAskModelResponse(BaseModel):
 class CursiveSetupOptions(BaseModel):
     max_retries: Optional[int] = None
     expand: Optional[CursiveSetupOptionsExpand] = None
+    is_using_openrouter: Optional[bool] = None
 
 
 class CompletionRequestFunctionCall(BaseModel):
