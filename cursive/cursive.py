@@ -1,3 +1,4 @@
+import atexit
 import asyncio
 import inspect
 import json
@@ -63,7 +64,7 @@ class Cursive:
         replicate: Optional[dict[str, Any]] = None,
         openrouter: Optional[dict[str, Any]] = None,
     ):
-        
+
         self._hooks = create_hooks()
         self.options = CursiveSetupOptions(
             max_retries=max_retries,
@@ -72,7 +73,7 @@ class Cursive:
         )
         if debug:
             self._debugger = create_debugger(self._hooks, {"tag": "cursive"})
-        
+
         openai_client.api_key = (openai or {}).get("api_key") or os.environ.get(
             "OPENAI_API_KEY"
         )
@@ -86,7 +87,7 @@ class Cursive:
             (replicate or {}).get("api_key")
             or os.environ.get("REPLICATE_API_TOKEN", "---")
         )
-        
+
         openrouter_api_key = (openrouter or {}).get("api_key") or os.environ.get(
             "OPENROUTER_API_KEY"
         )
@@ -95,14 +96,14 @@ class Cursive:
             openai_client.api_base = "https://openrouter.ai/api/v1"
             openai_client.api_key = openrouter_api_key
             self.options.is_using_openrouter = True
-            app_url = openrouter.get("app_url", "https://cursive.meistrari.com")
-            app_title = openrouter.get("app_title", "Cursive")
-            openai_client.requestssession = requests.Session()
-            openai_client.requestssession.headers.update({
-                'HTTP-Referer': app_url,
-                'X-Title': app_title,
+            session = requests.Session()
+            session.headers.update({
+                'HTTP-Referer': openrouter.get("app_url", "https://cursive.meistrari.com"),
+                'X-Title': openrouter.get("app_title", "Cursive"),
             })
-            
+            openai_client.requestssession = session
+            atexit.register(session.close)
+
 
         self._vendor = CursiveVendors(
             openai=openai_client,
@@ -254,7 +255,7 @@ def resolve_options(
     # TODO: Add support for function call resolving
     vendor = "openrouter" if cursive.options.is_using_openrouter \
         else resolve_vendor_from_model(model)
-    
+
     resolved_system_message = ""
 
     if vendor in ["anthropic", "cohere", "replicate"] and len(functions) > 0:
