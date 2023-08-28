@@ -3,6 +3,8 @@ from typing import AbstractSet, Collection, Literal
 
 import tiktoken
 
+from cursive.custom_types import CompletionMessage
+
 
 def encode(
     text: str,
@@ -18,7 +20,7 @@ def encode(
     )
 
 
-def get_openai_usage(content: str | list[dict]):
+def get_openai_usage(content: str | list[CompletionMessage]):
     if type(content) == list:
         tokens = {
             "per_message": 3,
@@ -28,8 +30,7 @@ def get_openai_usage(content: str | list[dict]):
         token_count = 3
         for message in content:
             token_count += tokens['per_message']
-
-            for attribute, value in message.items():
+            for attribute, value in message.model_dump().items():
                 if attribute == 'name':
                     token_count += tokens['per_name']
 

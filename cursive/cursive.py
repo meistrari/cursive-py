@@ -7,6 +7,7 @@ import os
 
 import openai as openai_client
 from anthropic import APIError
+import requests
 
 from cursive.build_input import get_function_call_directives
 from cursive.custom_function_call import parse_custom_function_call
@@ -37,7 +38,7 @@ from cursive.hookable import create_debugger, create_hooks
 from cursive.pricing import resolve_pricing
 from cursive.usage.anthropic import get_anthropic_usage
 from cursive.usage.openai import get_openai_usage
-from cursive.utils import filter_null_values, random_id, resguard
+from cursive.utils import delete_keys_from_dict, filter_null_values, random_id, resguard
 from cursive.vendor.anthropic import (
     AnthropicClient,
     process_anthropic_stream,
@@ -60,7 +61,18 @@ class Cursive:
         anthropic: Optional[dict[str, Any]] = None,
         cohere: Optional[dict[str, Any]] = None,
         replicate: Optional[dict[str, Any]] = None,
+        openrouter: Optional[dict[str, Any]] = None,
     ):
+        
+        self._hooks = create_hooks()
+        self.options = CursiveSetupOptions(
+            max_retries=max_retries,
+            expand=expand,
+            debug=debug,
+        )
+        if debug:
+            self._debugger = create_debugger(self._hooks, {"tag": "cursive"})
+        
         openai_client.api_key = (openai or {}).get("api_key") or os.environ.get(
             "OPENAI_API_KEY"
         )
@@ -74,22 +86,30 @@ class Cursive:
             (replicate or {}).get("api_key")
             or os.environ.get("REPLICATE_API_TOKEN", "---")
         )
+        
+        openrouter_api_key = (openrouter or {}).get("api_key") or os.environ.get(
+            "OPENROUTER_API_KEY"
+        )
 
-        self._hooks = create_hooks()
+        if openrouter_api_key:
+            openai_client.api_base = "https://openrouter.ai/api/v1"
+            openai_client.api_key = openrouter_api_key
+            self.options.is_using_openrouter = True
+            app_url = openrouter.get("app_url", "https://cursive.meistrari.com")
+            app_title = openrouter.get("app_title", "Cursive")
+            openai_client.requestssession = requests.Session()
+            openai_client.requestssession.headers.update({
+                'HTTP-Referer': app_url,
+                'X-Title': app_title,
+            })
+            
+
         self._vendor = CursiveVendors(
             openai=openai_client,
             anthropic=anthropic_client,
             cohere=cohere_client,
             replicate=replicate_client,
         )
-        self.options = CursiveSetupOptions(
-            max_retries=max_retries,
-            expand=expand,
-            debug=debug,
-        )
-
-        if debug:
-            self._debugger = create_debugger(self._hooks, {"tag": "cursive"})
 
     def on(self, event: CursiveHook, callback: Callable):
         self._hooks.hook(event, callback)
@@ -221,14 +241,22 @@ def resolve_options(
     stream: Optional[bool] = None,
     messages: Optional[list[CompletionMessage]] = None,
     prompt: Optional[str] = None,
+    cursive: Cursive = None,
 ):
     functions = functions or []
     messages = messages or []
-    model = model or "gpt-3.5-turbo"
+
+    # Resolve default model
+    model = model or (
+        "openai/gpt-3.5-turbo" if cursive.options.is_using_openrouter else "gpt-3.5-turbo"
+    )
 
     # TODO: Add support for function call resolving
-    vendor = resolve_vendor_from_model(model)
+    vendor = "openrouter" if cursive.options.is_using_openrouter \
+        else resolve_vendor_from_model(model)
+    
     resolved_system_message = ""
+
     if vendor in ["anthropic", "cohere", "replicate"] and len(functions) > 0:
         resolved_system_message = (
             (system_message or "") + "\n\n" + get_function_call_directives(functions)
@@ -308,21 +336,21 @@ def create_completion(
     data = {}
     start = time.time()
 
-    vendor = resolve_vendor_from_model(payload.model)
+    vendor = "openrouter" if cursive.options.is_using_openrouter \
+        else resolve_vendor_from_model(payload.model)
 
     # TODO:    Improve the completion creation based on model to vendor matching
-    if vendor == "openai":
-        payload.messages = list(
-            map(
-                lambda message: {
-                    k: v
-                    for k, v in message.model_dump().items()
-                    if k != "id" and v is not None
-                },
-                payload.messages,
-            )
-        )
+    if vendor in ["openai", "openrouter"]:
+
         resolved_payload = filter_null_values(payload.model_dump())
+
+        # Remove the ID from the messages before sending to OpenAI
+        resolved_payload["messages"] = [
+            filter_null_values(
+                delete_keys_from_dict(message, ["id"])
+            ) for message in resolved_payload["messages"]
+        ]
+
         response = cursive._vendor.openai.ChatCompletion.create(**resolved_payload)
         if payload.stream:
             data = process_openai_stream(
@@ -341,15 +369,18 @@ def create_completion(
         else:
             data = response
 
-        data["cost"] = resolve_pricing(
-            vendor="openai",
-            usage=CursiveAskUsage(
-                completion_tokens=data["usage"]["completion_tokens"],
-                prompt_tokens=data["usage"]["prompt_tokens"],
-                total_tokens=data["usage"]["total_tokens"],
-            ),
-            model=data["model"],
-        )
+        # If the user is using OpenRouter, there's no usage data
+        if "usage" in data:
+            data["cost"] = resolve_pricing(
+                vendor="openai",
+                usage=CursiveAskUsage(
+                    completion_tokens=data["usage"]["completion_tokens"],
+                    prompt_tokens=data["usage"]["prompt_tokens"],
+                    total_tokens=data["usage"]["total_tokens"],
+                ),
+                model=data["model"],
+            )
+
     elif vendor == "anthropic":
         response, error = resguard(
             lambda: cursive._vendor.anthropic.create_completion(payload), APIError
@@ -442,6 +473,12 @@ def create_completion(
         data = stream_transformer.process()
 
         parse_custom_function_call(data, payload)
+    else:
+        raise CursiveError(
+            message="Unknown model",
+            details=None,
+            code=CursiveErrorCode.completion_error,
+        )
     end = time.time()
 
     if data.get("error"):
@@ -501,6 +538,7 @@ def ask_model(
         stream=stream,
         messages=messages,
         prompt=prompt,
+        cursive=cursive,
     )
     start = time.time()
 
@@ -537,10 +575,10 @@ def ask_model(
                     default_model = (
                         cursive.expand and cursive.expand.defaultsTo
                     ) or "gpt-3.5-turbo-16k"
-                    resolve_model = (
-                        cursive.expand and cursive.expand.resolve_model
+                    model_mapping = (
+                        cursive.expand and cursive.expand.model_mapping
                     ) or {}
-                    resolved_model = resolve_model[model] or default_model
+                    resolved_model = model_mapping[model] or default_model
                     completion, error = resguard(
                         lambda: create_completion(
                             payload={**payload, "model": resolved_model},

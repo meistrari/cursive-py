@@ -5,11 +5,7 @@ model_prefix_to_vendor = {
     "replicate": ["replicate"],
 }
 
-
 def resolve_vendor_from_model(model: str):
-    if "/" in model:  # heuristic for OpenRouter.ai
-        return "openai"
-
     for vendor, prefixes in model_prefix_to_vendor.items():
         if any(model.startswith(m) for m in prefixes):
             return vendor
