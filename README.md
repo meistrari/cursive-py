@@ -79,7 +79,7 @@ cursive = Cursive()
 def add(a: float, b: float):
     """
     Adds two numbers.
-    
+
     a: The first number.
     b: The second number.
     """
@@ -101,7 +101,7 @@ The functions' result will automatically be fed into the conversation and anothe
 def create_character(name: str, age: str):
     """
     Creates a character.
-    
+
     name: The name of the character.
     age: The age of the character.
     """
@@ -156,7 +156,7 @@ cursive = Cursive(
     expand={
         'enable': True,
         'defaults_to': 'gpt-3.5-turbo-16k',
-        'model_mapping': {
+        'resolve_model': {
             'gpt-3.5-turbo': 'gpt-3.5-turbo-16k',
             'gpt-4': 'claude-2',
         },
@@ -179,6 +179,34 @@ You can pass your OpenAI API key to `Cursive`'s constructor, or set the `OPENAI_
 - `claude-instant-1`
 - `claude-instant-1.2`
 - Any other model version
+
+#### OpenRouter
+
+OpenRouter is a service that gives you access to leading language models in an OpenAI-compatible API, including function calling!
+
+- `anthropic/claude-instant-1.2`
+- `anthropic/claude-2`
+- `openai/gpt-4-32k`
+- `google/palm-2-codechat-bison`
+- `nousresearch/nous-hermes-llama2-13b`
+- Any model version from https://openrouter.ai/docs#models
+
+###### Credentials
+
+```python
+import openai
+import requests
+
+openai.api_key = "sk-or-..."
+openai.api_base = "https://openrouter.ai/api/v1"
+openai.requestssession = requests.Session()
+openai.requestssession.headers.update({"HTTP-Referer": "https://appurl.com", "X-Title": "YOUR_APP_NAME"})
+
+from cursive import Cursive
+
+cursive = Cursive()
+cursive.ask(prompt="What is the meaning of life?", model="anthropic/claude-instant-1.2")
+```
 
 ###### Credentials
 You can pass your Anthropic API key to `Cursive`'s constructor, or set the `ANTHROPIC_API_KEY` environment variable.
@@ -208,6 +236,6 @@ You can pass your Replicate API key to `Cursive`'s constructor, or set the `REPL
 ### vendor support
 - [x] Anthropic
 - [x] Cohere
-- [x] Replicate 
+- [x] Replicate
 - [ ] Azure OpenAI models
-- [ ] Huggingface 
+- [ ] Huggingface

@@ -1,14 +1,18 @@
 from enum import Enum
 from typing import Any, Callable, Literal, Optional
 
-from pydantic import BaseModel as PydanticBaseModel
+from pydantic import ConfigDict, BaseModel as PydanticBaseModel
 from cursive.function import CursiveFunction
 
 from cursive.utils import random_id
 
+
 class BaseModel(PydanticBaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        protected_namespaces=()
+    )
+
 
 class CursiveModel(Enum):
     GPT4 = "gpt4"
@@ -17,16 +21,15 @@ class CursiveModel(Enum):
     GPT3_5_TURBO_16K = "gpt-3.5-turbo-16k"
     CLAUDE_2 = "claude-2"
     CLAUDE_INSTANT_1_2 = "claude-instant-1.2"
-    CLAUDE_INSTANT_1 = "claude-instant-2.2"
+    CLAUDE_INSTANT_1 = "claude-instant-1.2"
     COMMAND = "command"
     COMMAND_NIGHTLY = "command-nightly"
+
 
 class CursiveAskUsage(BaseModel):
     completion_tokens: int
     prompt_tokens: int
     total_tokens: int
-
-
 
 
 class CursiveAskCost(BaseModel):
@@ -35,16 +38,19 @@ class CursiveAskCost(BaseModel):
     total: float
     version: str
 
+
 Role = Literal[
-    'system',
-    'user',
-    'assistant',
-    'function',
+    "system",
+    "user",
+    "assistant",
+    "function",
 ]
+
 
 class ChatCompletionRequestMessageFunctionCall(BaseModel):
     name: Optional[str] = None
     arguments: Optional[str] = None
+
 
 class CompletionMessage(BaseModel):
     id: Optional[str] = None
@@ -58,21 +64,24 @@ class CompletionMessage(BaseModel):
         if not self.id:
             self.id = random_id()
 
+
 class CursiveSetupOptionsExpand(BaseModel):
     enabled: Optional[bool] = None
     defaults_to: Optional[str] = None
     model_mapping: Optional[dict[str, str]] = None
 
+
 class CursiveErrorCode(Enum):
-    function_call_error = 'function_call_error',
-    completion_error = 'completion_error',
-    invalid_request_error = 'invalid_request_error',
-    embedding_error = 'embedding_error',
-    unknown_error = 'unknown_error',
+    function_call_error = ("function_call_error",)
+    completion_error = ("completion_error",)
+    invalid_request_error = ("invalid_request_error",)
+    embedding_error = ("embedding_error",)
+    unknown_error = ("unknown_error",)
+
 
 class CursiveError(Exception):
-    name = 'CursiveError'
-    
+    name = "CursiveError"
+
     def __init__(
         self,
         message: str,
@@ -84,18 +93,21 @@ class CursiveError(Exception):
         self.code = code
         super().__init__(self.message)
 
+
 class CursiveEnrichedAnswer(BaseModel):
-    error: CursiveError | None
-    usage: CursiveAskUsage | None
+    error: CursiveError | None = None
+    usage: CursiveAskUsage | None = None
     model: str
-    id: str | None
+    id: str | None = None
     choices: Optional[list[Any]] = None
-    function_result: Any | None
-    answer: str | None
-    messages: list[CompletionMessage] | None
-    cost: CursiveAskCost | None
+    function_result: Any | None = None
+    answer: str | None = None
+    messages: list[CompletionMessage] | None = None
+    cost: CursiveAskCost | None = None
+
 
 CursiveAskOnToken = Callable[[dict[str, Any]], None]
+
 
 class CursiveAskOptionsBase(BaseModel):
     model: Optional[str | CursiveModel] = None
@@ -115,37 +127,46 @@ class CursiveAskOptionsBase(BaseModel):
     user: Optional[str] = None
     stream: Optional[bool] = None
 
+
 class CreateChatCompletionResponse(BaseModel):
     id: str
     model: str
     choices: list[Any]
     usage: Optional[Any] = None
 
+
 class CreateChatCompletionResponseExtended(CreateChatCompletionResponse):
     function_result: Optional[Any] = None
     cost: Optional[CursiveAskCost] = None
     error: Optional[CursiveError] = None
 
+
 class CursiveAskModelResponse(BaseModel):
     answer: CreateChatCompletionResponseExtended
     messages: list[CompletionMessage]
 
+
 class CursiveSetupOptions(BaseModel):
     max_retries: Optional[int] = None
     expand: Optional[CursiveSetupOptionsExpand] = None
+    is_using_openrouter: Optional[bool] = None
+
 
 class CompletionRequestFunctionCall(BaseModel):
     name: str
     inputs: dict[str, Any]
 
+
 class CompletionRequestStop(BaseModel):
     messages_seen: Optional[list[CompletionMessage]] = None
     max_turns: Optional[int] = None
+
 
 class CompletionFunctions(BaseModel):
     name: str
     description: Optional[str] = None
     parameters: Optional[dict[str, Any]] = None
+
 
 class CompletionPayload(BaseModel):
     model: str
@@ -164,22 +185,24 @@ class CompletionPayload(BaseModel):
     user: Optional[str] = None
     other: Optional[dict[str, Any]] = None
 
+
 CursiveHook = Literal[
-    'embedding:before',
-    'embedding:after',
-    'embedding:error',
-    'embedding:success',
-    'completion:before',
-    'completion:after',
-    'completion:error',
-    'completion:success',
-    'ask:before',
-    'ask:after',
-    'ask:success',
-    'ask:error',
+    "embedding:before",
+    "embedding:after",
+    "embedding:error",
+    "embedding:success",
+    "completion:before",
+    "completion:after",
+    "completion:error",
+    "completion:success",
+    "ask:before",
+    "ask:after",
+    "ask:success",
+    "ask:error",
 ]
 
-class CursiveHookPayload():
+
+class CursiveHookPayload:
     data: Optional[Any]
     error: Optional[CursiveError]
     duration: Optional[float]
@@ -193,4 +216,3 @@ class CursiveHookPayload():
         self.data = data
         self.error = error
         self.duration = duration
-
