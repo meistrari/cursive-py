@@ -180,6 +180,9 @@ You can pass your OpenAI API key to `Cursive`'s constructor, or set the `OPENAI_
 - `claude-instant-1.2`
 - Any other model version
 
+###### Credentials
+You can pass your Anthropic API key to `Cursive`'s constructor, or set the `ANTHROPIC_API_KEY` environment variable.
+
 #### OpenRouter
 
 OpenRouter is a service that gives you access to leading language models in an OpenAI-compatible API, including function calling!
@@ -209,9 +212,6 @@ cursive.ask(
     prompt="What is the meaning of life?"
 )
 ```
-
-###### Credentials
-You can pass your Anthropic API key to `Cursive`'s constructor, or set the `ANTHROPIC_API_KEY` environment variable.
 
 #### Cohere
 - `command`
