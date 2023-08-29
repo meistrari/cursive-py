@@ -135,13 +135,13 @@ files = [
 
 [[package]]
 name = "anthropic"
-version = "0.3.10"
+version = "0.3.11"
 description = "Client library for the anthropic API"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "anthropic-0.3.10-py3-none-any.whl", hash = "sha256:95cd73168296a4f91a5899a28660991e044322cf94442d07b99901d4ca74acd6"},
-    {file = "anthropic-0.3.10.tar.gz", hash = "sha256:d1f66efc541fbff0ecfd37fd4d3690f9daaa748fc42d9ded5863a10815a5d97b"},
+    {file = "anthropic-0.3.11-py3-none-any.whl", hash = "sha256:5c81105cd9ee7388bff3fdb739aaddedc83bbae9b95d51c2d50c13b1ad106138"},
+    {file = "anthropic-0.3.11.tar.gz", hash = "sha256:2e0fa5351c9b368cbed0bbd7217deaa9409b82b56afaf244e2196e99eb4fe20e"},
 ]
 
 [package.dependencies]
@@ -1570,4 +1570,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.0,<3.12"
-content-hash = "b8fd02831f41f27163ca45812ad373f89e45c17b922c32b2588fa5eac6097002"
+content-hash = "8849268a7ced91bfcb144478499bec81dd2985db8d152c5f34c9369db0432266"

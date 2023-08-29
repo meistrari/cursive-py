@@ -1,3 +1,4 @@
+import atexit
 import asyncio
 import inspect
 import json
@@ -63,7 +64,6 @@ class Cursive:
         replicate: Optional[dict[str, Any]] = None,
         openrouter: Optional[dict[str, Any]] = None,
     ):
-        
         self._hooks = create_hooks()
         self.options = CursiveSetupOptions(
             max_retries=max_retries,
@@ -72,7 +72,7 @@ class Cursive:
         )
         if debug:
             self._debugger = create_debugger(self._hooks, {"tag": "cursive"})
-        
+
         openai_client.api_key = (openai or {}).get("api_key") or os.environ.get(
             "OPENAI_API_KEY"
         )
@@ -86,7 +86,7 @@ class Cursive:
             (replicate or {}).get("api_key")
             or os.environ.get("REPLICATE_API_TOKEN", "---")
         )
-        
+
         openrouter_api_key = (openrouter or {}).get("api_key") or os.environ.get(
             "OPENROUTER_API_KEY"
         )
@@ -95,14 +95,17 @@ class Cursive:
             openai_client.api_base = "https://openrouter.ai/api/v1"
             openai_client.api_key = openrouter_api_key
             self.options.is_using_openrouter = True
-            app_url = openrouter.get("app_url", "https://cursive.meistrari.com")
-            app_title = openrouter.get("app_title", "Cursive")
-            openai_client.requestssession = requests.Session()
-            openai_client.requestssession.headers.update({
-                'HTTP-Referer': app_url,
-                'X-Title': app_title,
-            })
-            
+            session = requests.Session()
+            session.headers.update(
+                {
+                    "HTTP-Referer": openrouter.get(
+                        "app_url", "https://cursive.meistrari.com"
+                    ),
+                    "X-Title": openrouter.get("app_title", "Cursive"),
+                }
+            )
+            openai_client.requestssession = session
+            atexit.register(session.close)
 
         self._vendor = CursiveVendors(
             openai=openai_client,
@@ -248,13 +251,18 @@ def resolve_options(
 
     # Resolve default model
     model = model or (
-        "openai/gpt-3.5-turbo" if cursive.options.is_using_openrouter else "gpt-3.5-turbo"
+        "openai/gpt-3.5-turbo"
+        if cursive.options.is_using_openrouter
+        else "gpt-3.5-turbo"
     )
 
     # TODO: Add support for function call resolving
-    vendor = "openrouter" if cursive.options.is_using_openrouter \
+    vendor = (
+        "openrouter"
+        if cursive.options.is_using_openrouter
         else resolve_vendor_from_model(model)
-    
+    )
+
     resolved_system_message = ""
 
     if vendor in ["anthropic", "cohere", "replicate"] and len(functions) > 0:
@@ -336,19 +344,20 @@ def create_completion(
     data = {}
     start = time.time()
 
-    vendor = "openrouter" if cursive.options.is_using_openrouter \
+    vendor = (
+        "openrouter"
+        if cursive.options.is_using_openrouter
         else resolve_vendor_from_model(payload.model)
+    )
 
     # TODO:    Improve the completion creation based on model to vendor matching
     if vendor in ["openai", "openrouter"]:
-
-        resolved_payload = filter_null_values(payload.model_dump())
+        resolved_payload = filter_null_values(payload.dict())
 
         # Remove the ID from the messages before sending to OpenAI
         resolved_payload["messages"] = [
-            filter_null_values(
-                delete_keys_from_dict(message, ["id"])
-            ) for message in resolved_payload["messages"]
+            filter_null_values(delete_keys_from_dict(message, ["id", "model_config"]))
+            for message in resolved_payload["messages"]
         ]
 
         response = cursive._vendor.openai.ChatCompletion.create(**resolved_payload)
@@ -710,7 +719,7 @@ def ask_model(
         if function_definition.pause:
             completion.function_result = function_result
             return CursiveAskModelResponse(
-                answer=CreateChatCompletionResponseExtended(**completion.model_dump()),
+                answer=CreateChatCompletionResponseExtended(**completion.dict()),
                 messages=messages,
             )
         else:

@@ -1,17 +1,19 @@
 from enum import Enum
 from typing import Any, Callable, Literal, Optional
 
-from pydantic import ConfigDict, BaseModel as PydanticBaseModel
-from cursive.function import CursiveFunction
+try:
+    from pydantic.v1 import BaseModel as PydanticBaseModel
+except ImportError:
+    from pydantic import BaseModel as PydanticBaseModel
 
+from cursive.function import CursiveFunction
 from cursive.utils import random_id
 
 
 class BaseModel(PydanticBaseModel):
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        protected_namespaces=()
-    )
+    class Config(PydanticBaseModel.Config):
+        arbitrary_types_allowed = True
+        protected_namespaces = ()
 
 
 class CursiveModel(Enum):
