@@ -165,22 +165,33 @@ cursive = Cursive(
 ```
 
 ## available models
-#### OpenAI
+<details>
+<summary><strong>OpenAI models<strong></summary>
+
 - `gpt-3.5-turbo`
 - `gpt-3.5-turbo-16k`
 - `gpt-4`
 - `gpt-4-32k`
 - Any other chat completion model version
+
 ###### Credentials
 You can pass your OpenAI API key to `Cursive`'s constructor, or set the `OPENAI_API_KEY` environment variable.
+</details>
 
-#### Anthropic
+<details>
+<summary><strong>Anthropic models</strong></summary>
+
 - `claude-2`
 - `claude-instant-1`
 - `claude-instant-1.2`
 - Any other model version
 
-#### OpenRouter
+###### Credentials
+You can pass your Anthropic API key to `Cursive`'s constructor, or set the `ANTHROPIC_API_KEY` environment variable.
+</details>
+
+<details>
+<summary><strong>OpenRouter models</strong></summary>
 
 OpenRouter is a service that gives you access to leading language models in an OpenAI-compatible API, including function calling!
 
@@ -209,18 +220,22 @@ cursive.ask(
     prompt="What is the meaning of life?"
 )
 ```
+</details>
 
-###### Credentials
-You can pass your Anthropic API key to `Cursive`'s constructor, or set the `ANTHROPIC_API_KEY` environment variable.
 
-#### Cohere
+<details>
+<summary><strong>Cohere models</strong></summary>
+
 - `command`
 - Any other model version (such as `command-nightly`)
 
 ###### Credentials
 You can pass your Cohere API key to `Cursive`'s constructor, or set the `COHERE_API_KEY` environment variable.
 
-#### Replicate
+</details>
+
+<details>
+<summary><strong>Replicate models</strong></summary>
 You can prepend `replicate/` to any model name and version available on Replicate.
 
 ###### Example
@@ -233,11 +248,15 @@ cursive.ask(
 
 ###### Credentials
 You can pass your Replicate API key to `Cursive`'s constructor, or set the `REPLICATE_API_TOKEN` environment variable.
+
+</details>
+
 ## roadmap
 
 ### vendor support
 - [x] Anthropic
 - [x] Cohere
 - [x] Replicate
+- [x] OpenRouter
 - [ ] Azure OpenAI models
 - [ ] Huggingface

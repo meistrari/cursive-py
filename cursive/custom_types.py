@@ -1,9 +1,9 @@
 from enum import Enum
 from typing import Any, Callable, Literal, Optional
 
+from cursive.compat.pydantic import BaseModel as PydanticBaseModel
 from cursive.function import CursiveFunction
 from cursive.utils import random_id
-from cursive.compat.pydantic import BaseModel as PydanticBaseModel
 
 
 class BaseModel(PydanticBaseModel):
