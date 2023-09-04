@@ -1,7 +1,7 @@
 import random
 import string
+
 from typing import Any, Callable, Optional, Tuple, Type, TypeVar, overload
-import re
 
 
 def destructure_items(keys: list[str], dictionary: dict):

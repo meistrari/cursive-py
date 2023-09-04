@@ -1,13 +1,9 @@
 from enum import Enum
 from typing import Any, Callable, Literal, Optional
 
-try:
-    from pydantic.v1 import BaseModel as PydanticBaseModel
-except ImportError:
-    from pydantic import BaseModel as PydanticBaseModel
-
 from cursive.function import CursiveFunction
 from cursive.utils import random_id
+from cursive.compat.pydantic import BaseModel as PydanticBaseModel
 
 
 class BaseModel(PydanticBaseModel):

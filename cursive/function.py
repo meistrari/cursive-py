@@ -2,7 +2,7 @@ import re
 from textwrap import dedent
 from typing import Any, Callable
 
-from pydantic import validate_arguments
+from cursive.compat.pydantic import validate_arguments
 
 
 class CursiveFunction:
