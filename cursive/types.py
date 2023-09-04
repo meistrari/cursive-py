@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Callable, Literal, Optional
 
-from cursive.compat.pydantic import BaseModel as PydanticBaseModel
+from cursive.compat.pydantic import BaseModel as PydanticBaseModel, Field
 from cursive.function import CursiveFunction
 from cursive.utils import random_id
 
@@ -12,7 +12,7 @@ class BaseModel(PydanticBaseModel):
         protected_namespaces = ()
 
 
-class CursiveModel(Enum):
+class CursiveLanguageModel(Enum):
     GPT4 = "gpt4"
     GPT4_32K = "gpt4-32k"
     GPT3_5_TURBO = "gpt-3.5-turbo"
@@ -108,7 +108,7 @@ CursiveAskOnToken = Callable[[dict[str, Any]], None]
 
 
 class CursiveAskOptionsBase(BaseModel):
-    model: Optional[str | CursiveModel] = None
+    model: Optional[str | CursiveLanguageModel] = None
     system_message: Optional[str] = None
     functions: Optional[list[CursiveFunction]] = None
     function_call: Optional[str | CursiveFunction] = None
@@ -152,7 +152,7 @@ class CursiveSetupOptions(BaseModel):
 
 class CompletionRequestFunctionCall(BaseModel):
     name: str
-    inputs: dict[str, Any]
+    inputs: dict[str, Any] = Field(default_factory=dict)
 
 
 class CompletionRequestStop(BaseModel):

@@ -6,10 +6,15 @@ from cursive.compat.pydantic import validate_arguments
 
 
 class CursiveFunction:
+    definition: Callable
+    description: str
+    parameters: dict[str, Any]
+    pause: bool
+
     def __init__(self, function: Callable, pause=False):
-        validate = validate_arguments(function)
-        self.parameters = validate.model.schema()
-        self.description = dedent(function.__doc__)
+        self.definition = function
+        self.description = dedent(function.__doc__ or "")
+        self.parameters = validate_arguments(function).model.schema()
         self.pause = pause
 
         # Delete ['v__duplicate_kwargs', 'args', 'kwargs'] from parameters
@@ -37,11 +42,9 @@ class CursiveFunction:
             "name": self.parameters["title"],
         }
 
-        self.definition = function
-
     def __call__(self, *args: Any):
         # Validate arguments and parse them
-        return self.function(*args)
+        return self.definition(*args)
 
 
 def cursive_function(pause=False):

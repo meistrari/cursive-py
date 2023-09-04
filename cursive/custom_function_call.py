@@ -1,7 +1,7 @@
 import json
 import re
 from typing import Any, Callable
-from cursive.custom_types import CompletionPayload
+from cursive.types import CompletionPayload
 
 
 def parse_custom_function_call(

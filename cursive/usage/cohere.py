@@ -1,6 +1,6 @@
 from tokenizers import Tokenizer
 from cursive.build_input import build_completion_input
-from cursive.custom_types import CompletionMessage
+from cursive.types import CompletionMessage
 
 
 def get_cohere_usage(content: str | list[CompletionMessage]):
@@ -8,5 +8,5 @@ def get_cohere_usage(content: str | list[CompletionMessage]):
 
     if type(content) != str:
         content = build_completion_input(content)
-    
+
     return len(tokenizer.encode(content).ids)
