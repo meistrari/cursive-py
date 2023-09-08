@@ -13,7 +13,7 @@ import requests
 from cursive.build_input import get_function_call_directives
 from cursive.compat.pydantic import BaseModel as PydanticBaseModel
 from cursive.custom_function_call import parse_custom_function_call
-from cursive.function import CursiveFunction
+from cursive.function import CursiveCustomFunction, CursiveFunction
 from cursive.model import CursiveModel
 from cursive.stream import StreamTransformer
 from cursive.usage.cohere import get_cohere_usage
@@ -369,15 +369,15 @@ def create_completion(
             data = response
 
         # If the user is using OpenRouter, there's no usage data
-        if "usage" in data:
+        if usage := data.get("usage"):
             data["cost"] = resolve_pricing(
                 vendor="openai",
-                usage=CursiveAskUsage(
-                    completion_tokens=data["usage"]["completion_tokens"],
-                    prompt_tokens=data["usage"]["prompt_tokens"],
-                    total_tokens=data["usage"]["total_tokens"],
-                ),
                 model=data["model"],
+                usage=CursiveAskUsage(
+                    completion_tokens=usage["completion_tokens"],
+                    prompt_tokens=usage["prompt_tokens"],
+                    total_tokens=usage["total_tokens"],
+                ),
             )
 
     elif vendor == "anthropic":
@@ -500,7 +500,7 @@ def create_completion(
 def cursive_wrapper(fn):
     if fn is None:
         return None
-    elif issubclass(fn, CursiveFunction):
+    elif issubclass(type(fn), CursiveCustomFunction):
         return fn
     elif inspect.isclass(fn) and issubclass(fn, PydanticBaseModel):
         return CursiveModel(fn)

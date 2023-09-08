@@ -2,15 +2,17 @@ import re
 from textwrap import dedent
 from typing import Any, Callable
 
-from cursive.compat.pydantic import validate_arguments
+from cursive.compat.pydantic import BaseModel, validate_arguments
 
 
-class CursiveFunction:
+class CursiveCustomFunction(BaseModel):
     definition: Callable
-    description: str
-    parameters: dict[str, Any]
-    pause: bool
+    description: str = ""
+    function_schema: dict[str, Any]
+    pause: bool = False
 
+
+class CursiveFunction(CursiveCustomFunction):
     def __init__(self, function: Callable, pause=False):
         self.definition = function
         self.description = dedent(function.__doc__ or "")
@@ -42,9 +44,9 @@ class CursiveFunction:
             "name": self.parameters["title"],
         }
 
-    def __call__(self, *args: Any):
+    def __call__(self, *args, **kwargs):
         # Validate arguments and parse them
-        return self.definition(*args)
+        return self.definition(*args, **kwargs)
 
 
 def cursive_function(pause=False):
