@@ -2,12 +2,12 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from inspect import signature
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 from warnings import warn
 
 
 def flatten_hooks_dictionary(
-    hooks: dict[str, dict | Callable], parent_name: Optional[str] = None
+    hooks: dict[str, dict | Callable], parent_name: str | None = None
 ):
     flattened_hooks = {}
 
@@ -143,7 +143,7 @@ class Hookable:
 
     def deprecate_hook(self, name: str, deprecated: Callable | str):
         self._deprecated_hooks[name] = (
-            {"to": deprecated} if type(deprecated) == str else deprecated
+            {"to": deprecated} if isinstance(deprecated, str) else deprecated
         )
         hooks = self._hooks[name] or []
         del self._hooks[name]
@@ -240,7 +240,7 @@ def create_debugger(hooks: Hookable, _options: dict[str, Any] = {}):
 
     id_control = {}
 
-    def unsubscribe_before_each(event: Optional[dict[str, Any]] = None):
+    def unsubscribe_before_each(event: dict[str, Any] | None = None):
         if event is None or not predicate(event["name"]):
             return
 
@@ -251,7 +251,7 @@ def create_debugger(hooks: Hookable, _options: dict[str, Any] = {}):
 
     unsubscribe_before = hooks.before_each(unsubscribe_before_each)
 
-    def unsubscribe_after_each(event: Optional[dict[str, Any]] = None):
+    def unsubscribe_after_each(event: dict[str, Any] | None = None):
         if event is None or not predicate(event["name"]):
             return
 

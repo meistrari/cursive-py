@@ -40,7 +40,7 @@ from cursive.hookable import create_debugger, create_hooks
 from cursive.pricing import resolve_pricing
 from cursive.usage.anthropic import get_anthropic_usage
 from cursive.usage.openai import get_openai_usage
-from cursive.utils import delete_keys_from_dict, filter_null_values, random_id, resguard
+from cursive.utils import delete_keys_from_dict, without_nones, random_id, resguard
 from cursive.vendor.anthropic import (
     AnthropicClient,
     process_anthropic_stream,
@@ -275,7 +275,7 @@ def resolve_options(
         if message
     ]
 
-    payload_params = filter_null_values(
+    payload_params = without_nones(
         {
             "on_token": on_token,
             "max_tokens": max_tokens,
@@ -290,7 +290,7 @@ def resolve_options(
             "user": user,
             "stream": stream,
             "model": model,
-            "messages": [filter_null_values(dict(m)) for m in query_messages],
+            "messages": [without_nones(dict(m)) for m in query_messages],
         }
     )
     if function_call:
@@ -342,11 +342,11 @@ def create_completion(
 
     # TODO:    Improve the completion creation based on model to vendor matching
     if vendor == "openai" or vendor == "openrouter":
-        resolved_payload = filter_null_values(payload.dict())
+        resolved_payload = without_nones(payload.dict())
 
         # Remove the ID from the messages before sending to OpenAI
         resolved_payload["messages"] = [
-            filter_null_values(delete_keys_from_dict(message, ["id", "model_config"]))
+            without_nones(delete_keys_from_dict(message, ["id", "model_config"]))
             for message in resolved_payload["messages"]
         ]
 

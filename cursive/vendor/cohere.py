@@ -4,7 +4,7 @@ from cursive.build_input import build_completion_input
 
 from cursive.types import CompletionPayload, CursiveAskOnToken
 from cursive.stream import StreamTransformer
-from cursive.utils import filter_null_values
+from cursive.utils import without_nones
 
 
 class CohereClient:
@@ -15,7 +15,7 @@ class CohereClient:
 
     def create_completion(self, payload: CompletionPayload):
         prompt = build_completion_input(payload.messages)
-        payload = filter_null_values(
+        payload = without_nones(
             {
                 "model": payload.model,
                 "max_tokens": payload.max_tokens or 3000,

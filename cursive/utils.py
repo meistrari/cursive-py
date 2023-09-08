@@ -12,7 +12,7 @@ def destructure_items(keys: list[str], dictionary: dict):
     return *items, new_dictionary
 
 
-def filter_null_values(dictionary: dict):
+def without_nones(dictionary: dict):
     return {k: v for k, v in dictionary.items() if v is not None}
 
 

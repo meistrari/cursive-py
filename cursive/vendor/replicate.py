@@ -2,7 +2,7 @@ import replicate
 
 from cursive.build_input import build_completion_input
 from cursive.types import CompletionPayload
-from cursive.utils import filter_null_values
+from cursive.utils import without_nones
 
 
 class ReplicateClient:
@@ -15,7 +15,7 @@ class ReplicateClient:
         prompt = build_completion_input(payload.messages)
         # Resolve model ID from `replicate/<model>`
         version = payload.model[payload.model.find("/") + 1 :]
-        resolved_payload = filter_null_values(
+        resolved_payload = without_nones(
             {
                 "max_new_tokens": payload.max_tokens or 2000,
                 "max_length": payload.max_tokens or 2000,

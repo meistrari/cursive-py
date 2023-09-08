@@ -9,7 +9,7 @@ from ..types import (
     CompletionPayload,
     CursiveAskOnToken,
 )
-from ..utils import filter_null_values
+from ..utils import without_nones
 
 
 class AnthropicClient:
@@ -20,7 +20,7 @@ class AnthropicClient:
 
     def create_completion(self, payload: CompletionPayload):
         prompt = build_completion_input(payload.messages)
-        payload = filter_null_values(
+        payload = without_nones(
             {
                 "model": payload.model,
                 "max_tokens_to_sample": payload.max_tokens or 100000,
