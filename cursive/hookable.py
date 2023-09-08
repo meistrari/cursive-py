@@ -6,13 +6,15 @@ from typing import Any, Callable, Optional
 from warnings import warn
 
 
-def flatten_hooks_dictionary(hooks: dict[str, Any], parent_name: Optional[str] = None):
+def flatten_hooks_dictionary(
+    hooks: dict[str, dict | Callable], parent_name: Optional[str] = None
+):
     flattened_hooks = {}
 
     for key, value in hooks.items():
         name = f"{parent_name}:{key}" if parent_name else key
 
-        if type(value) is dict:
+        if isinstance(value, dict):
             flattened_hooks.update(flatten_hooks_dictionary(value, name))
         elif callable(value):
             flattened_hooks[name] = value
@@ -184,9 +186,7 @@ class Hookable:
 
         call_each_with(self._before, event)
 
-        result = caller(
-            [*self._hooks[name]] if name in self._hooks.keys() else [], arguments
-        )
+        result = caller(self._hooks[name] if name in self._hooks else [], arguments)
 
         call_each_with(self._after, event)
 
@@ -221,12 +221,16 @@ def create_hooks():
     return Hookable()
 
 
+def starts_with_predicate(prefix: str):
+    return lambda name: name.startswith(prefix)
+
+
 def create_debugger(hooks: Hookable, _options: dict[str, Any] = {}):
     options = {"filter": lambda: True, **_options}
-    _filter = options["filter"]
 
-    def filter(name: str):
-        return name.startswith(_filter) if type(_filter) == str else _filter
+    predicate = options["filter"]
+    if isinstance(predicate, str):
+        predicate = starts_with_predicate(predicate)
 
     tag = f'[{options["tag"]}] ' if options["tag"] else ""
     start_times = {}
@@ -237,7 +241,7 @@ def create_debugger(hooks: Hookable, _options: dict[str, Any] = {}):
     id_control = {}
 
     def unsubscribe_before_each(event: Optional[dict[str, Any]] = None):
-        if event is None or (filter is not None and not filter(event["name"])):
+        if event is None or not predicate(event["name"]):
             return
 
         id_control[event["name"]] = id_control.get(event.get("name")) or 0
@@ -248,7 +252,7 @@ def create_debugger(hooks: Hookable, _options: dict[str, Any] = {}):
     unsubscribe_before = hooks.before_each(unsubscribe_before_each)
 
     def unsubscribe_after_each(event: Optional[dict[str, Any]] = None):
-        if event is None or (filter is None and not filter(event["name"])):
+        if event is None or not predicate(event["name"]):
             return
 
         label = log_prefix(event)
