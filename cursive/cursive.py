@@ -13,8 +13,8 @@ import requests
 from cursive.build_input import get_function_call_directives
 from cursive.compat.pydantic import BaseModel as PydanticBaseModel
 from cursive.custom_function_call import parse_custom_function_call
-from cursive.function import cursive_function
-from cursive.model import cursive_model
+from cursive.function import CursiveFunction
+from cursive.model import CursiveModel
 from cursive.stream import StreamTransformer
 from cursive.usage.cohere import get_cohere_usage
 from cursive.vendor.cohere import CohereClient, process_cohere_stream
@@ -30,7 +30,6 @@ from cursive.types import (
     CursiveEnrichedAnswer,
     CursiveError,
     CursiveErrorCode,
-    CursiveFunction,
     CursiveHook,
     CursiveHookPayload,
     CursiveSetupOptions,
@@ -504,9 +503,9 @@ def cursive_wrapper(fn):
     elif issubclass(fn, CursiveFunction):
         return fn
     elif inspect.isclass(fn) and issubclass(fn, PydanticBaseModel):
-        return cursive_model()(fn)
+        return CursiveModel(fn)
     elif inspect.isfunction(fn):
-        return cursive_function(pause=True)(fn)
+        return CursiveFunction(fn, pause=True)
 
 
 def ask_model(
