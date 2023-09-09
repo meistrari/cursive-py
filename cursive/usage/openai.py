@@ -3,7 +3,7 @@ from typing import AbstractSet, Collection, Literal
 
 import tiktoken
 
-from cursive.custom_types import CompletionMessage
+from cursive.types import CompletionMessage
 
 
 def encode(

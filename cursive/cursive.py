@@ -2,21 +2,23 @@ import atexit
 import asyncio
 import inspect
 import json
-import time
+from time import time, sleep
 from typing import Any, Callable, Generic, Optional, TypeVar
-import os
+from os import environ as env
 
-import openai as openai_client
 from anthropic import APIError
+import openai as openai_client
 import requests
 
 from cursive.build_input import get_function_call_directives
+from cursive.compat.pydantic import BaseModel as PydanticBaseModel
 from cursive.custom_function_call import parse_custom_function_call
+from cursive.function import CursiveCustomFunction, CursiveFunction
+from cursive.model import CursiveModel
 from cursive.stream import StreamTransformer
 from cursive.usage.cohere import get_cohere_usage
 from cursive.vendor.cohere import CohereClient, process_cohere_stream
-
-from cursive.custom_types import (
+from cursive.types import (
     BaseModel,
     CompletionMessage,
     CompletionPayload,
@@ -28,18 +30,17 @@ from cursive.custom_types import (
     CursiveEnrichedAnswer,
     CursiveError,
     CursiveErrorCode,
-    CursiveFunction,
     CursiveHook,
     CursiveHookPayload,
     CursiveSetupOptions,
     CursiveSetupOptionsExpand,
-    CursiveModel,
+    CursiveLanguageModel,
 )
 from cursive.hookable import create_debugger, create_hooks
 from cursive.pricing import resolve_pricing
 from cursive.usage.anthropic import get_anthropic_usage
 from cursive.usage.openai import get_openai_usage
-from cursive.utils import delete_keys_from_dict, filter_null_values, random_id, resguard
+from cursive.utils import delete_keys_from_dict, without_nones, random_id, resguard
 from cursive.vendor.anthropic import (
     AnthropicClient,
     process_anthropic_stream,
@@ -73,21 +74,20 @@ class Cursive:
         if debug:
             self._debugger = create_debugger(self._hooks, {"tag": "cursive"})
 
-        openai_client.api_key = (openai or {}).get("api_key") or os.environ.get(
+        openai_client.api_key = (openai or {}).get("api_key") or env.get(
             "OPENAI_API_KEY"
         )
         anthropic_client = AnthropicClient(
-            (anthropic or {}).get("api_key") or os.environ.get("ANTHROPIC_API_KEY")
+            (anthropic or {}).get("api_key") or env.get("ANTHROPIC_API_KEY")
         )
         cohere_client = CohereClient(
-            (cohere or {}).get("api_key") or os.environ.get("CO_API_KEY", "---")
+            (cohere or {}).get("api_key") or env.get("CO_API_KEY", "---")
         )
         replicate_client = ReplicateClient(
-            (replicate or {}).get("api_key")
-            or os.environ.get("REPLICATE_API_TOKEN", "---")
+            (replicate or {}).get("api_key") or env.get("REPLICATE_API_TOKEN", "---")
         )
 
-        openrouter_api_key = (openrouter or {}).get("api_key") or os.environ.get(
+        openrouter_api_key = (openrouter or {}).get("api_key") or env.get(
             "OPENROUTER_API_KEY"
         )
 
@@ -119,10 +119,10 @@ class Cursive:
 
     def ask(
         self,
-        model: Optional[str | CursiveModel] = None,
+        model: Optional[str | CursiveLanguageModel] = None,
         system_message: Optional[str] = None,
-        functions: Optional[list[CursiveFunction]] = None,
-        function_call: Optional[str | CursiveFunction] = None,
+        functions: Optional[list[Callable]] = None,
+        function_call: Optional[str | Callable] = None,
         on_token: Optional[CursiveAskOnToken] = None,
         max_tokens: Optional[int] = None,
         stop: Optional[list[str]] = None,
@@ -138,7 +138,7 @@ class Cursive:
         messages: Optional[list[CompletionMessage]] = None,
         prompt: Optional[str] = None,
     ):
-        model = model.value if isinstance(model, CursiveModel) else model
+        model = model.value if isinstance(model, CursiveLanguageModel) else model
 
         result = build_answer(
             cursive=self,
@@ -164,17 +164,9 @@ class Cursive:
         if result and result.error:
             return CursiveAnswer[CursiveError](error=result.error)
 
-        new_messages = [
-            *(result and result.messages or []),
-            CompletionMessage(
-                role="assistant",
-                content=result and result.answer or "",
-            ),
-        ]
-
         return CursiveAnswer(
             result=result,
-            messages=new_messages,
+            messages=result.messages,
             cursive=self,
         )
 
@@ -184,7 +176,7 @@ class Cursive:
             "input": content,
         }
         self._hooks.call_hook("embedding:before", CursiveHookPayload(data=options))
-        start = time.time()
+        start = time()
         try:
             data = self._vendor.openai.Embedding.create(
                 input=options["input"], model="text-embedding-ada-002"
@@ -197,12 +189,12 @@ class Cursive:
                 "embedding:success",
                 CursiveHookPayload(
                     data=result,
-                    time=time.time() - start,
+                    time=time() - start,
                 ),
             )
             self._hooks.call_hook(
                 "embedding:after",
-                CursiveHookPayload(data=result, duration=time.time() - start),
+                CursiveHookPayload(data=result, duration=time() - start),
             )
 
             return result["embedding"]
@@ -212,24 +204,20 @@ class Cursive:
             )
             self._hooks.call_hook(
                 "embedding:error",
-                CursiveHookPayload(
-                    data=error, error=error, duration=time.time() - start
-                ),
+                CursiveHookPayload(data=error, error=error, duration=time() - start),
             )
             self._hooks.call_hook(
                 "embedding:after",
-                CursiveHookPayload(
-                    data=error, error=error, duration=time.time() - start
-                ),
+                CursiveHookPayload(data=error, error=error, duration=time() - start),
             )
             raise error
 
 
 def resolve_options(
-    model: Optional[str | CursiveModel] = None,
+    model: Optional[str | CursiveLanguageModel] = None,
     system_message: Optional[str] = None,
-    functions: Optional[list[CursiveFunction]] = None,
-    function_call: Optional[str | CursiveFunction] = None,
+    functions: Optional[list[Callable]] = None,
+    function_call: Optional[str | Callable] = None,
     on_token: Optional[CursiveAskOnToken] = None,
     max_tokens: Optional[int] = None,
     stop: Optional[list[str]] = None,
@@ -246,8 +234,14 @@ def resolve_options(
     prompt: Optional[str] = None,
     cursive: Cursive = None,
 ):
-    functions = functions or []
     messages = messages or []
+
+    functions = functions or []
+    functions = [cursive_wrapper(f) for f in functions]
+
+    function_call = cursive_wrapper(function_call)
+    if function_call:
+        functions.append(function_call)
 
     # Resolve default model
     model = model or (
@@ -281,17 +275,7 @@ def resolve_options(
         if message
     ]
 
-    resolved_function_call = (
-        (
-            {"name": function_call.function_schema["name"]}
-            if isinstance(function_call, CursiveFunction)
-            else function_call
-        )
-        if function_call
-        else None
-    )
-
-    options = filter_null_values(
+    payload_params = without_nones(
         {
             "on_token": on_token,
             "max_tokens": max_tokens,
@@ -306,14 +290,19 @@ def resolve_options(
             "user": user,
             "stream": stream,
             "model": model,
-            "messages": list(
-                map(lambda message: filter_null_values(dict(message)), query_messages)
-            ),
-            "function_call": resolved_function_call,
+            "messages": [without_nones(dict(m)) for m in query_messages],
         }
     )
+    if function_call:
+        payload_params["function_call"] = (
+            {"name": function_call.function_schema["name"]}
+            if isinstance(function_call, CursiveFunction)
+            else function_call
+        )
+    if functions:
+        payload_params["functions"] = [fn.function_schema for fn in functions]
 
-    payload = CompletionPayload(**options)
+    payload = CompletionPayload(**payload_params)
 
     resolved_options = {
         "on_token": on_token,
@@ -330,6 +319,7 @@ def resolve_options(
         "stream": stream,
         "model": model,
         "messages": query_messages,
+        "functions": functions,
     }
 
     return payload, resolved_options
@@ -342,7 +332,7 @@ def create_completion(
 ) -> CreateChatCompletionResponseExtended:
     cursive._hooks.call_hook("completion:before", CursiveHookPayload(data=payload))
     data = {}
-    start = time.time()
+    start = time()
 
     vendor = (
         "openrouter"
@@ -351,12 +341,12 @@ def create_completion(
     )
 
     # TODO:    Improve the completion creation based on model to vendor matching
-    if vendor in ["openai", "openrouter"]:
-        resolved_payload = filter_null_values(payload.dict())
+    if vendor == "openai" or vendor == "openrouter":
+        resolved_payload = without_nones(payload.dict())
 
         # Remove the ID from the messages before sending to OpenAI
         resolved_payload["messages"] = [
-            filter_null_values(delete_keys_from_dict(message, ["id", "model_config"]))
+            without_nones(delete_keys_from_dict(message, ["id", "model_config"]))
             for message in resolved_payload["messages"]
         ]
 
@@ -369,7 +359,7 @@ def create_completion(
                 on_token=on_token,
             )
             content = "".join(
-                list(map(lambda choice: choice["message"]["content"], data["choices"]))
+                choice["message"]["content"] for choice in data["choices"]
             )
             data["usage"]["completion_tokens"] = get_openai_usage(content)
             data["usage"]["total_tokens"] = (
@@ -379,15 +369,15 @@ def create_completion(
             data = response
 
         # If the user is using OpenRouter, there's no usage data
-        if "usage" in data:
+        if usage := data.get("usage"):
             data["cost"] = resolve_pricing(
                 vendor="openai",
-                usage=CursiveAskUsage(
-                    completion_tokens=data["usage"]["completion_tokens"],
-                    prompt_tokens=data["usage"]["prompt_tokens"],
-                    total_tokens=data["usage"]["total_tokens"],
-                ),
                 model=data["model"],
+                usage=CursiveAskUsage(
+                    completion_tokens=usage["completion_tokens"],
+                    prompt_tokens=usage["prompt_tokens"],
+                    total_tokens=usage["total_tokens"],
+                ),
             )
 
     elif vendor == "anthropic":
@@ -488,7 +478,7 @@ def create_completion(
             details=None,
             code=CursiveErrorCode.completion_error,
         )
-    end = time.time()
+    end = time()
 
     if data.get("error"):
         error = CursiveError(
@@ -507,9 +497,20 @@ def create_completion(
     return CreateChatCompletionResponseExtended(**data)
 
 
+def cursive_wrapper(fn):
+    if fn is None:
+        return None
+    elif issubclass(type(fn), CursiveCustomFunction):
+        return fn
+    elif inspect.isclass(fn) and issubclass(fn, PydanticBaseModel):
+        return CursiveModel(fn)
+    elif inspect.isfunction(fn):
+        return CursiveFunction(fn, pause=True)
+
+
 def ask_model(
     cursive,
-    model: Optional[str | CursiveModel] = None,
+    model: Optional[str | CursiveLanguageModel] = None,
     system_message: Optional[str] = None,
     functions: Optional[list[CursiveFunction]] = None,
     function_call: Optional[str | CursiveFunction] = None,
@@ -549,17 +550,7 @@ def ask_model(
         prompt=prompt,
         cursive=cursive,
     )
-    start = time.time()
-
-    functions = functions or []
-
-    if type(function_call) == CursiveFunction:
-        functions.append(function_call)
-
-    function_schemas = list(map(lambda function: function.function_schema, functions))
-
-    if len(function_schemas) > 0:
-        payload.functions = function_schemas
+    start = time()
 
     completion, error = resguard(
         lambda: create_completion(
@@ -624,7 +615,7 @@ def ask_model(
 
                 if error:
                     if i > 3:
-                        time.sleep((i - 3) * 2)
+                        sleep((i - 3) * 2)
                     break
 
     if error:
@@ -641,85 +632,73 @@ def ask_model(
     if (
         completion
         and completion.choices
-        and len(completion.choices) > 0
-        and completion.choices[0].get("message")
-        and completion.choices[0]["message"].get("function_call")
+        and (fn_call := completion.choices[0].get("message", {}).get("function_call"))
     ):
-        payload.messages.append(
-            {
-                "role": "assistant",
-                "function_call": completion.choices[0]["message"].get("function_call"),
-                "content": "",
-            }
-        )
-        func_call = completion.choices[0]["message"].get("function_call")
-        function_definition = next(
-            (f for f in functions if f.function_schema["name"] == func_call["name"]),
+        function: CursiveFunction = next(
+            (
+                f
+                for f in resolved_options["functions"]
+                if f.function_schema["name"] == fn_call["name"]
+            ),
             None,
         )
 
-        if not function_definition:
+        if function is None:
             return ask_model(
                 **{
                     **resolved_options,
-                    "function_call": "none",
+                    "function_call": None,
                     "messages": payload.messages,
                     "cursive": cursive,
                 }
             )
 
-        name = func_call["name"]
-        called_function = next(
-            (func for func in payload.functions if func["name"] == name), None
-        )
-        arguments = json.loads(func_call["arguments"] or "{}")
-        if called_function:
-            props = called_function["parameters"]["properties"]
-            for k, v in props.items():
-                if k in arguments:
-                    try:
-                        arg_type = v["type"]
-                        if arg_type == "string":
+        called_function = function.function_schema
+        arguments = json.loads(fn_call["arguments"] or "{}")
+        props = called_function["parameters"]["properties"]
+        for k, v in props.items():
+            if k in arguments:
+                try:
+                    match v["type"]:
+                        case "string":
                             arguments[k] = str(arguments[k])
-                        elif arg_type == "number":
+                        case "number":
                             arguments[k] = float(arguments[k])
-                        elif arg_type == "integer":
+                        case "integer":
                             arguments[k] = int(arguments[k])
-                        elif arg_type == "boolean":
+                        case "boolean":
                             arguments[k] = bool(arguments[k])
-                    except Exception:
-                        pass
+                except Exception:
+                    pass
 
-        is_async = inspect.iscoroutinefunction(function_definition.definition)
+        is_async = inspect.iscoroutinefunction(function.definition)
         function_result = None
         try:
             if is_async:
-                function_result = asyncio.run(
-                    function_definition.definition(**arguments)
-                )
+                function_result = asyncio.run(function.definition(**arguments))
             else:
-                function_result = function_definition.definition(**arguments)
+                function_result = function.definition(**arguments)
         except Exception as error:
             raise CursiveError(
-                message=f'Error while running function ${func_call["name"]}',
+                message=f'Error while running function ${fn_call["name"]}',
                 details=error,
                 code=CursiveErrorCode.function_call_error,
             )
 
         messages = payload.messages or []
-
         messages.append(
             CompletionMessage(
-                role="function",
-                name=func_call["name"],
-                content=json.dumps(function_result or ""),
+                role="assistant",
+                name=fn_call["name"],
+                content=json.dumps(fn_call),
+                function_call=fn_call,
             )
         )
 
-        if function_definition.pause:
+        if function.pause:
             completion.function_result = function_result
             return CursiveAskModelResponse(
-                answer=CreateChatCompletionResponseExtended(**completion.dict()),
+                answer=completion,
                 messages=messages,
             )
         else:
@@ -732,20 +711,25 @@ def ask_model(
                 }
             )
 
-    end = time.time()
+    end = time()
     hook_payload = CursiveHookPayload(data=completion, duration=end - start)
     cursive._hooks.call_hook("ask:after", hook_payload)
     cursive._hooks.call_hook("ask:success", hook_payload)
 
-    return CursiveAskModelResponse(
-        answer=completion,
-        messages=payload.messages or [],
+    messages = payload.messages or []
+    messages.append(
+        CompletionMessage(
+            role="assistant",
+            content=completion.choices[0]["message"]["content"],
+        )
     )
+
+    return CursiveAskModelResponse(answer=completion, messages=messages)
 
 
 def build_answer(
     cursive,
-    model: Optional[str | CursiveModel] = None,
+    model: Optional[str | CursiveLanguageModel] = None,
     system_message: Optional[str] = None,
     functions: Optional[list[CursiveFunction]] = None,
     function_call: Optional[str | CursiveFunction] = None,
@@ -818,9 +802,7 @@ def build_answer(
             id=result.answer.id,
             usage=usage,
             cost=result.answer.cost,
-            choices=list(
-                map(lambda choice: choice["message"]["content"], result.answer.choices)
-            ),
+            choices=[choice["message"]["content"] for choice in result.answer.choices],
             function_result=result.answer.function_result or None,
             answer=result.answer.choices[-1]["message"]["content"],
             messages=result.messages,
@@ -836,7 +818,7 @@ class CursiveConversation:
 
     def ask(
         self,
-        model: Optional[str | CursiveModel] = None,
+        model: Optional[str | CursiveLanguageModel] = None,
         system_message: Optional[str] = None,
         functions: Optional[list[CursiveFunction]] = None,
         function_call: Optional[str | CursiveFunction] = None,
@@ -883,14 +865,9 @@ class CursiveConversation:
         if result and result.error:
             return CursiveAnswer[CursiveError](error=result.error)
 
-        new_messages = [
-            *(result and result.messages or []),
-            CompletionMessage(role="assistant", content=result and result.answer or ""),
-        ]
-
         return CursiveAnswer[None](
             result=result,
-            messages=new_messages,
+            messages=result.messages,
             cursive=self._cursive,
         )
 
@@ -917,7 +894,7 @@ E = TypeVar("E", None, CursiveError)
 class CursiveAnswer(Generic[E]):
     choices: Optional[list[str]]
     id: Optional[str]
-    model: Optional[str | CursiveModel]
+    model: Optional[str | CursiveLanguageModel]
     usage: Optional[CursiveAskUsage]
     cost: Optional[CursiveAskCost]
     error: Optional[E]

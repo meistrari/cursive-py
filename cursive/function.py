@@ -2,14 +2,21 @@ import re
 from textwrap import dedent
 from typing import Any, Callable
 
-from pydantic import validate_arguments
+from cursive.compat.pydantic import BaseModel, validate_arguments
 
 
-class CursiveFunction:
+class CursiveCustomFunction(BaseModel):
+    definition: Callable
+    description: str = ""
+    function_schema: dict[str, Any]
+    pause: bool = False
+
+
+class CursiveFunction(CursiveCustomFunction):
     def __init__(self, function: Callable, pause=False):
-        validate = validate_arguments(function)
-        self.parameters = validate.model.schema()
-        self.description = dedent(function.__doc__)
+        self.definition = function
+        self.description = dedent(function.__doc__ or "")
+        self.parameters = validate_arguments(function).model.schema()
         self.pause = pause
 
         # Delete ['v__duplicate_kwargs', 'args', 'kwargs'] from parameters
@@ -37,11 +44,9 @@ class CursiveFunction:
             "name": self.parameters["title"],
         }
 
-        self.definition = function
-
-    def __call__(self, *args: Any):
+    def __call__(self, *args, **kwargs):
         # Validate arguments and parse them
-        return self.function(*args)
+        return self.definition(*args, **kwargs)
 
 
 def cursive_function(pause=False):

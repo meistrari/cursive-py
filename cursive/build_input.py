@@ -1,6 +1,6 @@
 import json
 from textwrap import dedent
-from cursive.custom_types import CompletionMessage
+from cursive.types import CompletionMessage
 from cursive.function import CursiveFunction
 
 
@@ -79,7 +79,7 @@ def get_function_call_directives(functions: list[CursiveFunction]) -> str:
         When thinking out loud, always use the <cursive-think> tag.
         # Functions available:
         <functions>
-        {json.dumps(list(map(lambda f: f.function_schema, functions)))}
+        {json.dumps([f.function_schema for f in functions])}
         </functions>
         # Working with results
         You can either call a function or answer, *NEVER BOTH*.
