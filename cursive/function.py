@@ -13,36 +13,45 @@ class CursiveCustomFunction(BaseModel):
 
 
 class CursiveFunction(CursiveCustomFunction):
-    def __init__(self, function: Callable, pause=False):
-        self.definition = function
-        self.description = dedent(function.__doc__ or "")
-        self.parameters = validate_arguments(function).model.schema()
-        self.pause = pause
+    def __setup__(self, function: Callable):
+        definition = function
+        description = dedent(function.__doc__ or "").strip()
+        parameters = validate_arguments(function).model.schema()
 
         # Delete ['v__duplicate_kwargs', 'args', 'kwargs'] from parameters
         for k in ["v__duplicate_kwargs", "args", "kwargs"]:
-            if k in self.parameters["properties"]:
-                del self.parameters["properties"][k]
+            if k in parameters["properties"]:
+                del parameters["properties"][k]
 
-        for k, v in self.parameters["properties"].items():
+        for k, v in parameters["properties"].items():
             # Find the parameter description in the docstring
-            match = re.search(rf"{k}: (.*)", self.description)
+            match = re.search(rf"{k}: (.*)", description)
             if match:
                 v["description"] = match.group(1)
 
         schema = {}
-        if self.parameters:
-            schema = self.parameters
+        if parameters:
+            schema = parameters
 
-        self.function_schema = {
+        function_schema = {
             "parameters": {
                 "type": schema.get("type"),
                 "properties": schema.get("properties") or {},
                 "required": schema.get("required") or [],
             },
-            "description": self.description,
-            "name": self.parameters["title"],
+            "description": description,
+            "name": parameters["title"],
         }
+
+        return {
+            "definition": definition,
+            "description": description,
+            "function_schema": function_schema,
+        }
+
+    def __init__(self, function: Callable, pause=False):
+        setup = self.__setup__(function)
+        super().__init__(**setup, pause=pause)
 
     def __call__(self, *args, **kwargs):
         # Validate arguments and parse them

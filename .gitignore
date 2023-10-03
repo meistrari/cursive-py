@@ -5,3 +5,4 @@ dist
 playground.py
 .pytest_cache
 ipython.py
+.tox
