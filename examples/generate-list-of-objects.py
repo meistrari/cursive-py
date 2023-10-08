@@ -20,9 +20,9 @@ def gen_character_list(inputs: List[Input]):
 c = Cursive()
 
 res = c.ask(
-    prompt="Generate a headline for a SaaS company.",
+    prompt="Generate a input for prompt that generates headlines for a SaaS company.",
     model="gpt-4",
-    function_call=gen_character_list
+    function_call=Input
 )
 
 print(res.function_result)

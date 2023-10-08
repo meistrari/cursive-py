@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cursivepy"
-version = "0.7.1"
+version = "0.7.2"
 description = ""
 authors = [
   "Rodrigo Godinho <god@meistrari.com>",
