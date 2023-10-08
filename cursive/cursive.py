@@ -189,7 +189,7 @@ class Cursive:
                 "embedding:success",
                 CursiveHookPayload(
                     data=result,
-                    time=time() - start,
+                    duration=time() - start,
                 ),
             )
             self._hooks.call_hook(

@@ -20,6 +20,7 @@ cohere = "^4.19.3"
 tokenizers = "^0.13.3"
 replicate = "^0.11.0"
 sorcery = "^0.2.2"
+numpy = "^1.26.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
